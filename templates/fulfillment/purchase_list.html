@@ -1,0 +1,147 @@
+{% extends 'base.html' %}
+{% load humanize %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2>🛒 발주 및 매입 관리</h2>
+    <div>
+        <a href="{% url 'fulfillment:export_purchase' %}" class="btn btn-success me-2">
+            <i class="bi bi-file-earmark-excel"></i> 엑셀 다운로드
+        </a>
+        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addPurchaseModal">
+            <i class="bi bi-plus-lg"></i> 신규 발주서 작성
+        </button>
+    </div>
+</div>
+
+<div class="card shadow-sm mt-3">
+    <div class="card-body p-0">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>매입번호</th>
+                    <th>공급사</th>
+                    <th>매입일자</th>
+                    <th>총 매입액</th>
+                    <th>상태</th>
+                    <th>증빙</th>
+                    <th class="text-center">관리</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for pur in purchases %}
+                <tr>
+                    <td>#{{ pur.id }}</td>
+                    <td class="fw-bold">{{ pur.supplier.name }}</td>
+                    <td>{{ pur.purchase_date|date:"Y-m-d" }}</td>
+                    <td class="fw-bold">{{ pur.total_amount|intcomma }} đ</td>
+                    <td>
+                        {% if pur.status == 'RECEIVED' %} <span class="badge bg-primary">입고완료</span>
+                        {% else %} <span class="badge bg-secondary">발주중</span> {% endif %}
+                    </td>
+                    <td>
+                        {% if pur.is_bill_published %} <span class="badge bg-success">계산서 O</span>
+                        {% else %} <span class="badge bg-danger">미수취</span> {% endif %}
+                    </td>
+                    <td class="text-center">
+                        <a href="{% url 'fulfillment:purchase_update' pur.id %}" class="btn btn-sm btn-outline-primary me-1"><i class="bi bi-pencil-square"></i></a>
+                        <a href="{% url 'fulfillment:purchase_delete' pur.id %}" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="7" class="text-center p-4">매입 내역이 없습니다.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="modal fade" id="addPurchaseModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-xl">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title">🛒 신규 발주 등록 (통합)</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            
+            <form method="post" action="{% url 'fulfillment:purchase_create' %}">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="row g-3 mb-4 bg-light p-3 rounded">
+                        <div class="col-md-6"><label class="form-label fw-bold">공급사</label>{{ form.supplier }}</div>
+                        <div class="col-md-3"><label class="form-label fw-bold">발주 일자</label>{{ form.purchase_date }}</div>
+                        <div class="col-md-3"><label class="form-label fw-bold">상태</label>{{ form.status }}</div>
+                    </div>
+
+                    <h6 class="fw-bold mb-2">🛒 발주 품목 목록</h6>
+                    <table class="table table-bordered text-center align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="width: 30%;">상품명</th>
+                                <th style="width: 15%;">수량</th>
+                                <th style="width: 25%;">적치 위치</th>
+                                <th style="width: 20%;">유통기한</th>
+                                <th style="width: 10%;">예상금액</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for i in "12345" %}
+                            <tr>
+                                <td>
+                                    <select name="items-{{ forloop.counter0 }}-product" class="form-select product-select" onchange="updatePurRow(this)">
+                                        <option value="">-- 상품 --</option>
+                                        {% for prod in products_all %}
+                                            <option value="{{ prod.id }}" data-price="{{ prod.purchase_price }}">{{ prod.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </td>
+                                <td>
+                                    <input type="number" name="items-{{ forloop.counter0 }}-quantity" class="form-control quantity-input" oninput="updatePurRow(this)">
+                                </td>
+                                <td>
+                                    <select name="items-{{ forloop.counter0 }}-target_location" class="form-select">
+                                        <option value="">-- 위치 --</option>
+                                        {% for loc in locations_all %}
+                                            <option value="{{ loc.id }}">{{ loc.code }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </td>
+                                <td>
+                                    <input type="date" name="items-{{ forloop.counter0 }}-expiry_date" class="form-control">
+                                </td>
+                                <td>
+                                    <input type="text" class="form-control-plaintext text-end total-display" readonly value="0">
+                                </td>
+                            </tr>
+                            {% endfor %}
+                            <input type="hidden" name="items-TOTAL_FORMS" value="5">
+                            <input type="hidden" name="items-INITIAL_FORMS" value="0">
+                        </tbody>
+                    </table>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">취소</button>
+                    <button type="submit" class="btn btn-primary">발주 저장</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    function updatePurRow(element) {
+        const row = element.closest('tr');
+        const select = row.querySelector('.product-select');
+        const quantity = row.querySelector('.quantity-input').value || 0;
+        const totalDisplay = row.querySelector('.total-display');
+        
+        // 상품이 선택되지 않았을 때 에러 방지
+        let price = 0;
+        if (select.selectedIndex > 0) {
+            price = select.selectedOptions[0].dataset.price || 0;
+        }
+        
+        totalDisplay.value = Number(price * quantity).toLocaleString() + ' đ';
+    }
+</script>
+{% endblock %}

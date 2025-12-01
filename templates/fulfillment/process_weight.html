@@ -1,0 +1,89 @@
+{% extends 'base.html' %}
+{% load humanize %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2>⚖️ 피킹 검수 및 중량 입력</h2>
+        <span class="badge bg-primary fs-6">주문번호 #{{ order.id }}</span>
+    </div>
+    
+    <div class="alert alert-light border shadow-sm mb-4">
+        <div class="row">
+            <div class="col-md-6">
+                <strong>👤 고객명:</strong> {{ order.client.name }}
+            </div>
+            <div class="col-md-6">
+                <strong>📅 주문일자:</strong> {{ order.order_date|date:"Y-m-d H:i" }}
+            </div>
+        </div>
+    </div>
+
+    <form method="post">
+        {% csrf_token %}
+        
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-white fw-bold">
+                📋 피킹 리스트 (작업 지시서)
+            </div>
+            <div class="card-body p-0">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th style="width: 30%;">상품명</th>
+                            <th style="width: 15%;">지시 수량</th>
+                            <th style="width: 20%;">피킹 위치</th>
+                            <th style="width: 35%; background-color: #fff3cd;">실측 중량 (kg) 입력</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for picking in order.picking_lists.all %}
+                        <tr>
+                            <td>
+                                <span class="fw-bold">{{ picking.inventory.product.name }}</span>
+                                <br>
+                                <small class="text-muted">{{ picking.inventory.product.sku }}</small>
+                            </td>
+                            <td>
+                                <span class="badge bg-secondary fs-6">{{ picking.allocated_qty }} {{ picking.inventory.product.unit }}</span>
+                            </td>
+                            <td>
+                                <i class="bi bi-geo-alt-fill text-danger"></i> 
+                                <strong>{{ picking.inventory.location.code }}</strong>
+                            </td>
+                            <td>
+                                <div class="input-group">
+                                    <input type="number" 
+                                           step="0.01" 
+                                           name="weight_{{ picking.id }}" 
+                                           class="form-control form-control-lg border-warning fw-bold text-end" 
+                                           placeholder="0.00" 
+                                           value="{{ picking.picked_weight|default:'' }}"
+                                           required>
+                                    <span class="input-group-text bg-warning text-dark fw-bold">kg</span>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="d-flex justify-content-between align-items-center mt-4 pb-5">
+            <div>
+                <a href="{% url 'fulfillment:dashboard' %}" class="btn btn-secondary btn-lg me-2">
+                    <i class="bi bi-house-door-fill"></i> 홈으로
+                </a>
+                <a href="{% url 'fulfillment:order_list' %}" class="btn btn-outline-secondary btn-lg">
+                    <i class="bi bi-list-ul"></i> 목록으로
+                </a>
+            </div>
+
+            <button type="submit" class="btn btn-success btn-lg px-5 shadow">
+                <i class="bi bi-check-circle-fill me-2"></i> 출고 확정 (명세서 발행)
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}

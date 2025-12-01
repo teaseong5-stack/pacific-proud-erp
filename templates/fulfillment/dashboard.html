@@ -1,0 +1,155 @@
+{% extends 'base.html' %}
+{% load humanize %}
+
+{% block content %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>📊 경영 현황 (CEO Dashboard)</h2>
+    <span class="text-muted">오늘 날짜: {% now "Y년 m월 d일" %}</span>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card text-white bg-primary shadow-sm h-100">
+            <div class="card-body">
+                <h6 class="card-title opacity-75">오늘 확정 매출</h6>
+                <h3 class="fw-bold">{{ today_revenue|intcomma }} đ</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-white {% if month_profit >= 0 %}bg-success{% else %}bg-danger{% endif %} shadow-sm h-100">
+            <div class="card-body">
+                <h6 class="card-title opacity-75">이번 달 영업이익 (잠정)</h6>
+                <h3 class="fw-bold">{{ month_profit|intcomma }} đ</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-white bg-info shadow-sm h-100">
+            <div class="card-body">
+                <h6 class="card-title opacity-75">총 미수금 (받을 돈)</h6>
+                <h3 class="fw-bold">{{ total_receivable|intcomma }} đ</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-white bg-warning text-dark shadow-sm h-100">
+            <div class="card-body">
+                <h6 class="card-title opacity-75">총 미지급금 (줄 돈)</h6>
+                <h3 class="fw-bold">{{ total_payable|intcomma }} đ</h3>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-8">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-white fw-bold">📈 주간 매출 추이 (최근 7일)</div>
+            <div class="card-body">
+                <canvas id="salesChart" height="120"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-white fw-bold">💰 이번 달 비용 비중</div>
+            <div class="card-body">
+                <canvas id="expenseChart" height="200"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="card shadow-sm border-danger">
+            <div class="card-header bg-danger text-white fw-bold">⚠ 유통기한 임박 재고</div>
+            <table class="table table-sm table-hover mb-0">
+                <thead><tr><th>상품명</th><th>위치</th><th>유통기한</th></tr></thead>
+                <tbody>
+                    {% for item in expiring %}
+                    <tr>
+                        <td>{{ item.product.name }}</td>
+                        <td>{{ item.location.code }}</td>
+                        <td class="text-danger fw-bold">{{ item.expiry_date|date:"Y-m-d" }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="3" class="text-center text-muted p-3">위험 재고 없음</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card shadow-sm">
+            <div class="card-header bg-white fw-bold">📋 최근 주문 접수</div>
+            <ul class="list-group list-group-flush">
+                {% for order in recent_orders %}
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    <span>
+                        <span class="badge bg-secondary me-2">{{ order.id }}</span>
+                        {{ order.client.name|default:"미지정" }}
+                    </span>
+                    <span class="badge {% if order.status == 'SHIPPED' %}bg-success{% else %}bg-warning text-dark{% endif %}">
+                        {{ order.get_status_display }}
+                    </span>
+                </li>
+                {% empty %}
+                <li class="list-group-item text-center p-3">최근 주문 없음</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+</div>
+
+<script>
+    // 0. 안전하게 데이터 가져오기 (데이터가 없어도 에러 안 나게 처리)
+    const chartDates = {{ chart_dates|default:"[]"|safe }};
+    const chartRevenues = {{ chart_revenues|default:"[]"|safe }};
+    const expenseLabels = {{ expense_labels|default:"[]"|safe }};
+    const expenseDataList = {{ expense_data|default:"[]"|safe }};
+
+    // 1. 매출 라인 차트 설정
+    const salesCtx = document.getElementById('salesChart').getContext('2d');
+    new Chart(salesCtx, {
+        type: 'line',
+        data: {
+            labels: chartDates,
+            datasets: [{
+                label: '매출액 (VND)',
+                data: chartRevenues,
+                borderColor: '#0d6efd',
+                backgroundColor: 'rgba(13, 110, 253, 0.1)',
+                tension: 0.3,
+                fill: true
+            }]
+        },
+        options: {
+            scales: { y: { beginAtZero: true } },
+            plugins: { legend: { display: false } },
+            maintainAspectRatio: false
+        }
+    });
+
+    // 2. 비용 파이 차트 설정
+    const expenseCtx = document.getElementById('expenseChart').getContext('2d');
+    new Chart(expenseCtx, {
+        type: 'doughnut',
+        data: {
+            labels: expenseLabels,
+            datasets: [{
+                data: expenseDataList,
+                backgroundColor: ['#ffc107', '#20c997', '#fd7e14', '#6610f2', '#6c757d', '#dc3545', '#0dcaf0']
+            }]
+        },
+        options: {
+            maintainAspectRatio: false,
+            plugins: { legend: { position: 'bottom' } }
+        }
+    });
+</script>
+{% endblock %}

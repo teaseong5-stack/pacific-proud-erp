@@ -1,0 +1,60 @@
+{% extends 'base.html' %}
+{% load humanize %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2>📦 실시간 재고 현황</h2>
+    <div>
+        <a href="{% url 'fulfillment:export_inventory' %}" class="btn btn-success me-2">
+            <i class="bi bi-file-earmark-excel"></i> 엑셀 다운로드
+        </a>
+        <a href="{% url 'fulfillment:inbound_create' %}" class="btn btn-primary">
+            <i class="bi bi-plus-lg"></i> 입고 등록
+        </a>
+    </div>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-body p-0">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>상품명</th>
+                    <th>SKU</th>
+                    <th>현재위치</th>
+                    <th>배치번호</th>
+                    <th>유통기한</th>
+                    <th class="text-end">수량</th>
+                    <th class="text-center">관리</th> </tr>
+            </thead>
+            <tbody>
+                {% for item in inventories %}
+                <tr>
+                    <td class="fw-bold">{{ item.product.name }}</td>
+                    <td>{{ item.product.sku }}</td>
+                    <td><span class="badge bg-secondary">{{ item.location.code }}</span></td>
+                    <td>{{ item.batch_number }}</td>
+                    <td {% if item.is_expired %}class="text-danger fw-bold"{% endif %}>
+                        {{ item.expiry_date|date:"Y-m-d" }}
+                        {% if item.is_expired %}(만료){% endif %}
+                    </td>
+                    <td class="text-end fw-bold" style="font-size: 1.1em;">
+                        {{ item.quantity|intcomma }} {{ item.product.unit }}
+                    </td>
+                    <td class="text-center">
+                        <a href="{% url 'fulfillment:inventory_update' item.id %}" class="btn btn-sm btn-outline-primary me-1" title="수정">
+                            <i class="bi bi-pencil-square"></i>
+                        </a>
+                        <a href="{% url 'fulfillment:inventory_delete' item.id %}" class="btn btn-sm btn-outline-danger" title="삭제">
+                            <i class="bi bi-trash"></i>
+                        </a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="7" class="text-center p-4">재고가 없습니다.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

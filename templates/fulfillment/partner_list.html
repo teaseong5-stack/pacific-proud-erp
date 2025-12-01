@@ -1,0 +1,112 @@
+{% extends 'base.html' %}
+{% load humanize %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2>🏢 거래처 관리</h2>
+    
+    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addPartnerModal">
+        <i class="bi bi-plus-lg"></i> 신규 거래처 등록
+    </button>
+</div>
+
+<div class="card shadow-sm mt-3">
+    <div class="card-body p-0">
+        <table class="table table-hover align-middle mb-0" style="font-size: 0.95rem;">
+            <thead class="table-light">
+                <tr>
+                    <th style="width: 10%;">구분</th>
+                    <th style="width: 15%;">상호명</th>
+                    <th style="width: 15%;">대표자 (연락처)</th>
+                    <th style="width: 10%;">담당자</th>
+                    <th style="width: 15%;">담당자 연락처</th>
+                    <th style="width: 20%;">주소</th> 
+                    <th style="width: 10%;" class="text-end">잔액</th>
+                    <th style="width: 5%;" class="text-center">관리</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in partners %}
+                <tr>
+                    <td>
+                        {% if p.partner_type == 'SUPPLIER' %}<span class="badge bg-secondary">매입처</span>
+                        {% elif p.partner_type == 'CLIENT' %}<span class="badge bg-primary">매출처</span>
+                        {% else %}<span class="badge bg-info text-dark">혼합</span>{% endif %}
+                    </td>
+                    
+                    <td class="fw-bold">{{ p.name }}</td>
+                    
+                    <td>
+                        {{ p.owner_name|default:"-" }}
+                        {% if p.phone %}<br><small class="text-muted">{{ p.phone }}</small>{% endif %}
+                    </td>
+                    
+                    <td>{{ p.contact_person|default:"-" }}</td>
+                    
+                    <td>{{ p.contact_phone|default:"-" }}</td>
+                    
+                    <td class="text-truncate" style="max-width: 150px;" title="{{ p.address }}">
+                        {{ p.address|default:"-" }}
+                    </td>
+
+                    <td class="text-end fw-bold" style="color: {% if p.current_balance >= 0 %}blue{% else %}red{% endif %};">
+                        {{ p.current_balance|intcomma }} đ
+                    </td>
+
+                    <td class="text-center">
+                        <a href="{% url 'fulfillment:partner_update' p.id %}" class="btn btn-sm btn-outline-primary me-1">
+                            <i class="bi bi-pencil-square"></i>
+                        </a>
+                        <a href="{% url 'fulfillment:partner_delete' p.id %}" class="btn btn-sm btn-outline-danger">
+                            <i class="bi bi-trash"></i>
+                        </a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="8" class="text-center p-4">등록된 거래처가 없습니다.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="modal fade" id="addPartnerModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title">🏢 신규 거래처 등록</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="post" action="{% url 'fulfillment:partner_create' %}">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <h6 class="border-bottom pb-2 mb-3 text-primary fw-bold">기본 정보</h6>
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-8"><label class="form-label fw-bold">상호명</label>{{ form.name }}</div>
+                        <div class="col-md-4"><label class="form-label fw-bold">구분</label>{{ form.partner_type }}</div>
+                        <div class="col-md-6"><label class="form-label fw-bold">사업자번호</label>{{ form.biz_number }}</div>
+                        <div class="col-md-6"><label class="form-label fw-bold">주소</label>{{ form.address }}</div>
+                    </div>
+                    <h6 class="border-bottom pb-2 mb-3 text-primary fw-bold">연락처 정보</h6>
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-6"><label class="form-label fw-bold">대표자명</label>{{ form.owner_name }}</div>
+                        <div class="col-md-6"><label class="form-label fw-bold">대표 전화</label>{{ form.phone }}</div>
+                        <div class="col-md-6"><label class="form-label fw-bold bg-light p-1 rounded">실무 담당자명</label>{{ form.contact_person }}</div>
+                        <div class="col-md-6"><label class="form-label fw-bold bg-light p-1 rounded">담당자 휴대폰</label>{{ form.contact_phone }}</div>
+                    </div>
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label class="form-label fw-bold">기초 이월 잔액</label>
+                            <div class="input-group">{{ form.initial_balance }}<span class="input-group-text">đ</span></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">취소</button>
+                    <button type="submit" class="btn btn-primary">등록 완료</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

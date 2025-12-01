@@ -1,0 +1,9 @@
+{% extends 'base.html' %}
+{% block content %}
+<h2>📦 신규 입고 등록</h2>
+<form method="post" class="mt-4" style="max-width: 500px;">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit" class="btn btn-primary w-100">입고 및 라벨 출력</button>
+</form>
+{% endblock %}

@@ -1,0 +1,54 @@
+{% extends 'base.html' %}
+{% load humanize %} {% block content %}
+<div class="container mt-4">
+    <h2 class="mb-4">📊 {{ year }}년 {{ month }}월 손익계산서 (VND)</h2>
+
+    <div class="row text-center">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white mb-3">
+                <div class="card-header">매출액 (Revenue)</div>
+                <div class="card-body"><h4>{{ total_revenue|intcomma }} đ</h4></div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-secondary text-white mb-3">
+                <div class="card-header">매출원가 (COGS)</div>
+                <div class="card-body"><h4>- {{ total_cogs|intcomma }} đ</h4></div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-warning text-dark mb-3">
+                <div class="card-header">판관비 (Expenses)</div>
+                <div class="card-body"><h4>- {{ total_expense|intcomma }} đ</h4></div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card {% if operating_profit >= 0 %}bg-success{% else %}bg-danger{% endif %} text-white mb-3">
+                <div class="card-header">영업이익 (OP)</div>
+                <div class="card-body">
+                    <h4>{{ operating_profit|intcomma }} đ</h4>
+                    <small>이익률: {{ op_margin }}%</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header fw-bold">판관비 상세 내역</div>
+                <ul class="list-group list-group-flush">
+                    {% for item in expense_list %}
+                    <li class="list-group-item d-flex justify-content-between">
+                        <span>{{ item.category }}</span>
+                        <strong>{{ item.sum|intcomma }} đ</strong>
+                    </li>
+                    {% empty %}
+                    <li class="list-group-item text-center text-muted">지출 내역이 없습니다.</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
