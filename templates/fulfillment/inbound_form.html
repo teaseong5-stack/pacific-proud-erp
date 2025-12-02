@@ -1,9 +1,177 @@
 {% extends 'base.html' %}
+{% load humanize %}
+
 {% block content %}
-<h2>📦 신규 입고 등록</h2>
-<form method="post" class="mt-4" style="max-width: 500px;">
-    {% csrf_token %}
-    {{ form.as_p }}
-    <button type="submit" class="btn btn-primary w-100">입고 및 라벨 출력</button>
-</form>
+<div class="container mt-4" style="max-width: 1000px;">
+    
+    <div class="d-flex align-items-center mb-4">
+        <div class="bg-primary text-white rounded-circle d-flex justify-content-center align-items-center me-3 shadow" style="width: 50px; height: 50px;">
+            <i class="bi bi-box-seam fs-4"></i>
+        </div>
+        <div>
+            <h3 class="fw-bold mb-0">신규 자재 입고</h3>
+            <p class="text-muted mb-0 small">물류센터 입고 처리 및 바코드 라벨 발행</p>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-lg-7">
+            <div class="card shadow-sm border-0 h-100">
+                <div class="card-body p-4">
+                    <form method="post" id="inboundForm">
+                        {% csrf_token %}
+                        
+                        <div class="mb-4">
+                            <label class="form-label fw-bold text-primary">📦 입고 상품 선택</label>
+                            {{ form.product }}
+                            <div class="form-text">상품명, SKU, 카테고리로 검색 가능합니다.</div>
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label fw-bold text-primary">📍 적치 위치 (Location)</label>
+                            {{ form.location }}
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label fw-bold text-primary">🔢 입고 수량</label>
+                            <div class="input-group input-group-lg">
+                                {{ form.quantity }}
+                                <span class="input-group-text bg-light fw-bold" id="unitDisplay" style="min-width: 80px;">Unit</span>
+                            </div>
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label fw-bold text-primary">📅 유통기한 (Expiry Date)</label>
+                            {{ form.expiry_date }}
+                            
+                            <div class="d-flex gap-2 mt-2">
+                                <button type="button" class="btn btn-outline-secondary btn-sm flex-fill" onclick="setDate(7)">+1주</button>
+                                <button type="button" class="btn btn-outline-secondary btn-sm flex-fill" onclick="setDate(30)">+1개월</button>
+                                <button type="button" class="btn btn-outline-secondary btn-sm flex-fill" onclick="setDate(180)">+6개월</button>
+                                <button type="button" class="btn btn-outline-secondary btn-sm flex-fill" onclick="setDate(365)">+1년</button>
+                            </div>
+                        </div>
+
+                        <hr class="my-4">
+
+                        <button type="submit" class="btn btn-primary btn-lg w-100 shadow-sm py-3">
+                            <i class="bi bi-qr-code me-2"></i> 입고 확정 및 라벨 출력
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-5">
+            <div class="card shadow-sm border-0 bg-light h-100">
+                <div class="card-body p-4 text-center d-flex flex-column justify-content-center" id="emptyState">
+                    <i class="bi bi-basket3 display-1 text-muted opacity-25 mb-3"></i>
+                    <h5 class="text-muted">상품을 선택해주세요</h5>
+                    <p class="text-muted small">선택한 상품의 상세 정보가 여기에 표시됩니다.</p>
+                </div>
+
+                <div class="card-body p-4 d-none" id="productInfoCard">
+                    <div class="text-center mb-4">
+                        <div class="badge bg-warning text-dark mb-2 fs-6 shadow-sm" id="infoCategory">카테고리</div>
+                        <h4 class="fw-bold mb-1" id="infoName">상품명</h4>
+                        <p class="text-muted font-monospace" id="infoSku">SKU-CODE</p>
+                    </div>
+
+                    <ul class="list-group shadow-sm rounded-3">
+                        <li class="list-group-item d-flex justify-content-between align-items-center p-3">
+                            <span>📏 기준 규격(단위)</span>
+                            <span class="fw-bold fs-5 text-primary" id="infoUnit">-</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center p-3">
+                            <span>❄️ 보관 방법</span>
+                            <span class="fw-bold" id="infoStorage">-</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center p-3">
+                            <span>⏳ 권장 유통기한</span>
+                            <span class="fw-bold" id="infoShelfLife">-</span>
+                        </li>
+                    </ul>
+                    
+                    <div class="alert alert-info mt-4 d-flex align-items-center shadow-sm">
+                        <i class="bi bi-info-circle-fill me-2 fs-4"></i>
+                        <div>
+                            입고 시 <strong>배치 번호</strong>가<br>자동으로 생성됩니다.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="productData" style="display:none;">
+    {% for p in products %}
+    <div data-id="{{ p.id }}" 
+         data-name="{{ p.name }}" 
+         data-sku="{{ p.sku }}" 
+         data-unit="{{ p.unit }}" 
+         data-category="{{ p.get_category_display }}"
+         data-storage="{{ p.get_storage_type_display }}"
+         data-shelflife="{{ p.shelf_life_days }}"></div>
+    {% endfor %}
+</div>
+
+<script>
+    // 1. 상품 선택 시 우측 카드 정보 업데이트
+    $(document).ready(function() {
+        // Select2 적용 (검색 기능)
+        $('.search-select').select2({
+            theme: 'bootstrap-5',
+            width: '100%',
+            placeholder: '검색 또는 선택'
+        });
+
+        // 변경 이벤트 감지
+        $('#id_product').on('change', function() {
+            const selectedId = $(this).val();
+            
+            if (selectedId) {
+                // 데이터 찾기
+                const dataDiv = $(`#productData div[data-id="${selectedId}"]`);
+                const name = dataDiv.data('name');
+                const sku = dataDiv.data('sku');
+                const unit = dataDiv.data('unit');
+                const category = dataDiv.data('category');
+                const storage = dataDiv.data('storage');
+                const shelfLife = dataDiv.data('shelflife');
+
+                // 화면 갱신
+                $('#infoName').text(name);
+                $('#infoSku').text(sku);
+                $('#infoUnit').text(unit);
+                $('#unitDisplay').text(unit); // 입력창 옆 단위 변경
+                $('#infoCategory').text(category);
+                $('#infoStorage').text(storage);
+                $('#infoShelfLife').text(shelfLife + "일");
+
+                // UI 전환
+                $('#emptyState').addClass('d-none');
+                $('#productInfoCard').removeClass('d-none').hide().fadeIn(300);
+            } else {
+                // 초기화
+                $('#emptyState').removeClass('d-none');
+                $('#productInfoCard').addClass('d-none');
+                $('#unitDisplay').text("Unit");
+            }
+        });
+    });
+
+    // 2. 날짜 퀵 버튼 기능
+    function setDate(days) {
+        const date = new Date();
+        date.setDate(date.getDate() + days);
+        
+        const yyyy = date.getFullYear();
+        const mm = String(date.getMonth() + 1).padStart(2, '0');
+        const dd = String(date.getDate()).padStart(2, '0');
+        
+        // Django 폼 ID는 id_필드명 형식
+        document.getElementById('id_expiry_date').value = `${yyyy}-${mm}-${dd}`;
+    }
+</script>
 {% endblock %}

@@ -4,13 +4,60 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-3">
     <h2>🚚 주문 및 출고 관리</h2>
+    
     <div>
-        <a href="{% url 'fulfillment:export_order' %}" class="btn btn-success me-2">
+        <a href="{% url 'fulfillment:export_order' %}?{{ request.GET.urlencode }}" class="btn btn-success me-2">
             <i class="bi bi-file-earmark-excel"></i> 엑셀 다운로드
         </a>
         <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addOrderModal">
             <i class="bi bi-plus-lg"></i> 신규 주문 접수
         </button>
+    </div>
+</div>
+
+<div class="card shadow-sm mb-4 bg-light">
+    <div class="card-body py-3">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label fw-bold small">주문 기간</label>
+                <div class="input-group">
+                    <input type="date" name="start_date" class="form-control" value="{{ request.GET.start_date }}">
+                    <span class="input-group-text">~</span>
+                    <input type="date" name="end_date" class="form-control" value="{{ request.GET.end_date }}">
+                </div>
+            </div>
+
+            <div class="col-md-3">
+                <label class="form-label fw-bold small">납품처 (고객)</label>
+                <select name="client" class="form-select search-select">
+                    <option value="">전체 고객</option>
+                    {% for cli in clients %}
+                        <option value="{{ cli.id }}" {% if request.GET.client == cli.id|stringformat:"s" %}selected{% endif %}>
+                            {{ cli.name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="col-md-2">
+                <label class="form-label fw-bold small">진행 상태</label>
+                <select name="status" class="form-select">
+                    <option value="">전체 상태</option>
+                    <option value="PENDING" {% if request.GET.status == 'PENDING' %}selected{% endif %}>접수대기</option>
+                    <option value="ALLOCATED" {% if request.GET.status == 'ALLOCATED' %}selected{% endif %}>피킹중</option>
+                    <option value="SHIPPED" {% if request.GET.status == 'SHIPPED' %}selected{% endif %}>출고완료</option>
+                </select>
+            </div>
+
+            <div class="col-md-4 d-flex gap-2">
+                <button type="submit" class="btn btn-secondary flex-fill">
+                    <i class="bi bi-search"></i> 조회
+                </button>
+                <a href="{% url 'fulfillment:order_list' %}" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-counterclockwise"></i> 초기화
+                </a>
+            </div>
+        </form>
     </div>
 </div>
 
@@ -40,14 +87,22 @@
                         {% else %} <span class="badge bg-warning text-dark">접수대기</span> {% endif %}
                     </td>
                     <td class="text-center" style="white-space: nowrap;">
-                        <a href="{% url 'fulfillment:process_weight' order.id %}" class="btn btn-sm btn-outline-success me-1" title="중량/검수"><i class="bi bi-ui-checks"></i></a>
-                        <a href="{% url 'fulfillment:generate_invoice' order.id %}" class="btn btn-sm btn-outline-secondary me-1" target="_blank" title="명세서"><i class="bi bi-receipt"></i></a>
-                        <a href="{% url 'fulfillment:order_update' order.id %}" class="btn btn-sm btn-outline-primary me-1" title="수정"><i class="bi bi-pencil-square"></i></a>
-                        <a href="{% url 'fulfillment:order_delete' order.id %}" class="btn btn-sm btn-outline-danger" title="삭제"><i class="bi bi-trash"></i></a>
+                        <a href="{% url 'fulfillment:process_weight' order.id %}" class="btn btn-sm btn-outline-success me-1" title="중량/검수">
+                            <i class="bi bi-ui-checks"></i>
+                        </a>
+                        <a href="{% url 'fulfillment:generate_invoice' order.id %}" class="btn btn-sm btn-outline-secondary me-1" target="_blank" title="명세서">
+                            <i class="bi bi-receipt"></i>
+                        </a>
+                        <a href="{% url 'fulfillment:order_update' order.id %}" class="btn btn-sm btn-outline-primary me-1" title="수정">
+                            <i class="bi bi-pencil-square"></i>
+                        </a>
+                        <a href="{% url 'fulfillment:order_delete' order.id %}" class="btn btn-sm btn-outline-danger" title="삭제">
+                            <i class="bi bi-trash"></i>
+                        </a>
                     </td>
                 </tr>
                 {% empty %}
-                <tr><td colspan="6" class="text-center p-4">주문 내역이 없습니다.</td></tr>
+                <tr><td colspan="6" class="text-center p-4">검색된 주문 내역이 없습니다.</td></tr>
                 {% endfor %}
             </tbody>
         </table>
@@ -55,9 +110,10 @@
 </div>
 
 <div class="modal fade" id="addOrderModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-xl"> <div class="modal-content">
+    <div class="modal-dialog modal-dialog-centered modal-xl">
+        <div class="modal-content">
             <div class="modal-header bg-primary text-white">
-                <h5 class="modal-title">🚚 신규 주문 등록</h5>
+                <h5 class="modal-title">🚚 신규 주문 등록 (통합)</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             
@@ -65,29 +121,24 @@
                 {% csrf_token %}
                 <div class="modal-body">
                     <div class="row g-3 mb-4 bg-light p-3 rounded border">
-                        <div class="col-md-4">
+                        <div class="col-md-6">
                             <label class="form-label fw-bold">납품처 (고객)</label>
                             {{ form.client }}
                         </div>
-                        <div class="col-md-3">
-                            <label class="form-label fw-bold">진행 상태</label>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">상태</label>
                             {{ form.status }}
-                        </div>
-                        <div class="col-md-5">
-                            <label class="form-label fw-bold">📝 주문 메모</label>
-                            {{ form.memo }}
                         </div>
                     </div>
 
-                    <h6 class="fw-bold mb-2 ps-1 border-start border-4 border-primary">&nbsp;주문 상품 목록</h6>
-                    <table class="table table-bordered text-center align-middle shadow-sm">
-                        <thead class="table-secondary">
+                    <h6 class="fw-bold mb-2">📦 주문 상품 목록</h6>
+                    <table class="table table-bordered text-center align-middle">
+                        <thead class="table-light">
                             <tr>
-                                <th style="width: 30%;">상품명</th>
-                                <th style="width: 15%;">규격(단위)</th>
-                                <th style="width: 15%;">주문수량</th>
-                                <th style="width: 20%;">단가 (매가)</th>
-                                <th style="width: 20%;">합계 금액</th>
+                                <th style="width: 30%;">상품명 (규격)</th>
+                                <th style="width: 20%;">수량</th>
+                                <th style="width: 20%;">예상 단가</th>
+                                <th style="width: 20%;">합계</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -97,25 +148,20 @@
                                     <select name="items-{{ forloop.counter0 }}-product" class="form-select product-select" onchange="updateOrderRow(this)">
                                         <option value="">-- 상품 선택 --</option>
                                         {% for prod in products_all %}
-                                            <option value="{{ prod.id }}" 
-                                                    data-price="{{ prod.price }}" 
-                                                    data-unit="{{ prod.unit }}">
-                                                {{ prod.name }}
+                                            <option value="{{ prod.id }}" data-price="{{ prod.price }}" data-unit="{{ prod.unit }}">
+                                                {{ prod.name }} ({{ prod.unit }})
                                             </option>
                                         {% endfor %}
                                     </select>
                                 </td>
                                 <td>
-                                    <input type="text" class="form-control-plaintext text-center unit-display fw-bold text-muted" readonly value="-">
-                                </td>
-                                <td>
-                                    <input type="number" name="items-{{ forloop.counter0 }}-quantity" class="form-control quantity-input text-center" placeholder="0" oninput="updateOrderRow(this)">
+                                    <input type="number" name="items-{{ forloop.counter0 }}-quantity" class="form-control quantity-input" oninput="updateOrderRow(this)">
                                 </td>
                                 <td>
                                     <input type="text" class="form-control-plaintext text-end price-display" readonly value="0">
                                 </td>
                                 <td>
-                                    <input type="text" class="form-control-plaintext text-end total-display fw-bold text-primary" readonly value="0">
+                                    <input type="text" class="form-control-plaintext text-end total-display fw-bold" readonly value="0">
                                 </td>
                             </tr>
                             {% endfor %}
@@ -125,7 +171,7 @@
                         </tbody>
                         <tfoot class="table-light">
                             <tr>
-                                <td colspan="4" class="text-end fw-bold">총 합계 :</td>
+                                <td colspan="3" class="text-end fw-bold">총 합계 :</td>
                                 <td class="text-end fw-bold text-danger fs-5" id="grandTotal">0 đ</td>
                             </tr>
                         </tfoot>
@@ -133,7 +179,7 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">취소</button>
-                    <button type="submit" class="btn btn-primary px-4">주문 등록 완료</button>
+                    <button type="submit" class="btn btn-primary">주문 완료</button>
                 </div>
             </form>
         </div>
@@ -145,20 +191,20 @@
     function updateOrderRow(element) {
         const row = element.closest('tr');
         const select = row.querySelector('.product-select');
-        const unitDisplay = row.querySelector('.unit-display');
         const quantityInput = row.querySelector('.quantity-input');
         const priceDisplay = row.querySelector('.price-display');
         const totalDisplay = row.querySelector('.total-display');
 
         // 선택된 옵션의 데이터 가져오기
-        const selectedOption = select.selectedOptions[0];
-        const price = selectedOption.dataset.price || 0;
-        const unit = selectedOption.dataset.unit || "-";
+        let price = 0;
+        if (select.selectedIndex > 0) {
+            price = select.selectedOptions[0].dataset.price || 0;
+        }
+        
         const quantity = quantityInput.value || 0;
         const total = price * quantity;
 
         // 화면에 뿌리기
-        unitDisplay.value = unit;
         priceDisplay.value = Number(price).toLocaleString() + ' đ';
         totalDisplay.value = Number(total).toLocaleString() + ' đ';
         

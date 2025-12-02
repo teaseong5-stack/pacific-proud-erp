@@ -7,13 +7,31 @@ from .models import (
 
 # 1. 물류/재고 폼
 class InboundForm(forms.ModelForm):
-    product = forms.ModelChoiceField(queryset=Product.objects.all(), widget=forms.Select(attrs={'class': 'form-select'}))
-    location = forms.ModelChoiceField(queryset=Location.objects.filter(is_active=True), widget=forms.Select(attrs={'class': 'form-select'}))
-    quantity = forms.IntegerField(widget=forms.NumberInput(attrs={'class': 'form-control'}))
-    expiry_date = forms.DateField(widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}))
+    """입고 등록 폼 (UI 개선용)"""
     class Meta:
         model = Inventory
         fields = ['product', 'location', 'quantity', 'expiry_date']
+        widgets = {
+            'product': forms.Select(attrs={
+                'class': 'form-select search-select', # select2 적용
+                'data-placeholder': '상품을 검색하세요 (이름 또는 SKU)',
+                'style': 'width: 100%;'
+            }),
+            'location': forms.Select(attrs={
+                'class': 'form-select search-select',
+                'data-placeholder': '적치 위치 선택',
+                'style': 'width: 100%;'
+            }),
+            'quantity': forms.NumberInput(attrs={
+                'class': 'form-control form-control-lg fw-bold text-end', # 크고 굵게
+                'placeholder': '0',
+                'min': '1'
+            }),
+            'expiry_date': forms.DateInput(attrs={
+                'type': 'date',
+                'class': 'form-control form-control-lg text-center'
+            }),
+        }
 
 class InventoryForm(forms.ModelForm):
     class Meta:

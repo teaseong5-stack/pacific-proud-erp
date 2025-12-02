@@ -4,13 +4,59 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-3">
     <h2>🛒 발주 및 매입 관리</h2>
+    
     <div>
-        <a href="{% url 'fulfillment:export_purchase' %}" class="btn btn-success me-2">
+        <a href="{% url 'fulfillment:export_purchase' %}?{{ request.GET.urlencode }}" class="btn btn-success me-2">
             <i class="bi bi-file-earmark-excel"></i> 엑셀 다운로드
         </a>
         <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addPurchaseModal">
             <i class="bi bi-plus-lg"></i> 신규 발주서 작성
         </button>
+    </div>
+</div>
+
+<div class="card shadow-sm mb-4 bg-light">
+    <div class="card-body py-3">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label fw-bold small">조회 기간</label>
+                <div class="input-group">
+                    <input type="date" name="start_date" class="form-control" value="{{ request.GET.start_date }}">
+                    <span class="input-group-text">~</span>
+                    <input type="date" name="end_date" class="form-control" value="{{ request.GET.end_date }}">
+                </div>
+            </div>
+
+            <div class="col-md-3">
+                <label class="form-label fw-bold small">공급사</label>
+                <select name="supplier" class="form-select search-select">
+                    <option value="">전체 공급사</option>
+                    {% for sup in suppliers %}
+                        <option value="{{ sup.id }}" {% if request.GET.supplier == sup.id|stringformat:"s" %}selected{% endif %}>
+                            {{ sup.name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="col-md-2">
+                <label class="form-label fw-bold small">진행 상태</label>
+                <select name="status" class="form-select">
+                    <option value="">전체 상태</option>
+                    <option value="ORDERED" {% if request.GET.status == 'ORDERED' %}selected{% endif %}>발주중</option>
+                    <option value="RECEIVED" {% if request.GET.status == 'RECEIVED' %}selected{% endif %}>입고완료</option>
+                </select>
+            </div>
+
+            <div class="col-md-4 d-flex gap-2">
+                <button type="submit" class="btn btn-secondary flex-fill">
+                    <i class="bi bi-search"></i> 조회
+                </button>
+                <a href="{% url 'fulfillment:purchase_list' %}" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-counterclockwise"></i> 초기화
+                </a>
+            </div>
+        </form>
     </div>
 </div>
 
@@ -36,20 +82,30 @@
                     <td>{{ pur.purchase_date|date:"Y-m-d" }}</td>
                     <td class="fw-bold">{{ pur.total_amount|intcomma }} đ</td>
                     <td>
-                        {% if pur.status == 'RECEIVED' %} <span class="badge bg-primary">입고완료</span>
-                        {% else %} <span class="badge bg-secondary">발주중</span> {% endif %}
+                        {% if pur.status == 'RECEIVED' %}
+                            <span class="badge bg-primary">입고완료</span>
+                        {% else %}
+                            <span class="badge bg-secondary">발주중</span>
+                        {% endif %}
                     </td>
                     <td>
-                        {% if pur.is_bill_published %} <span class="badge bg-success">계산서 O</span>
-                        {% else %} <span class="badge bg-danger">미수취</span> {% endif %}
+                        {% if pur.is_bill_published %}
+                            <span class="badge bg-success">계산서 O</span>
+                        {% else %}
+                            <span class="badge bg-danger">미수취</span>
+                        {% endif %}
                     </td>
                     <td class="text-center">
-                        <a href="{% url 'fulfillment:purchase_update' pur.id %}" class="btn btn-sm btn-outline-primary me-1"><i class="bi bi-pencil-square"></i></a>
-                        <a href="{% url 'fulfillment:purchase_delete' pur.id %}" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></a>
+                        <a href="{% url 'fulfillment:purchase_update' pur.id %}" class="btn btn-sm btn-outline-primary me-1" title="수정">
+                            <i class="bi bi-pencil-square"></i>
+                        </a>
+                        <a href="{% url 'fulfillment:purchase_delete' pur.id %}" class="btn btn-sm btn-outline-danger" title="삭제">
+                            <i class="bi bi-trash"></i>
+                        </a>
                     </td>
                 </tr>
                 {% empty %}
-                <tr><td colspan="7" class="text-center p-4">매입 내역이 없습니다.</td></tr>
+                <tr><td colspan="7" class="text-center p-4">검색된 매입 내역이 없습니다.</td></tr>
                 {% endfor %}
             </tbody>
         </table>
@@ -67,7 +123,7 @@
             <form method="post" action="{% url 'fulfillment:purchase_create' %}">
                 {% csrf_token %}
                 <div class="modal-body">
-                    <div class="row g-3 mb-4 bg-light p-3 rounded">
+                    <div class="row g-3 mb-4 bg-light p-3 rounded border">
                         <div class="col-md-6"><label class="form-label fw-bold">공급사</label>{{ form.supplier }}</div>
                         <div class="col-md-3"><label class="form-label fw-bold">발주 일자</label>{{ form.purchase_date }}</div>
                         <div class="col-md-3"><label class="form-label fw-bold">상태</label>{{ form.status }}</div>
@@ -114,6 +170,7 @@
                                 </td>
                             </tr>
                             {% endfor %}
+                            
                             <input type="hidden" name="items-TOTAL_FORMS" value="5">
                             <input type="hidden" name="items-INITIAL_FORMS" value="0">
                         </tbody>
@@ -129,13 +186,13 @@
 </div>
 
 <script>
+    // 팝업 안에서 상품 선택 시 금액 자동 계산
     function updatePurRow(element) {
         const row = element.closest('tr');
         const select = row.querySelector('.product-select');
         const quantity = row.querySelector('.quantity-input').value || 0;
         const totalDisplay = row.querySelector('.total-display');
         
-        // 상품이 선택되지 않았을 때 에러 방지
         let price = 0;
         if (select.selectedIndex > 0) {
             price = select.selectedOptions[0].dataset.price || 0;

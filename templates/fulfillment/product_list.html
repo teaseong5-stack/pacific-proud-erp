@@ -10,6 +10,50 @@
     </button>
 </div>
 
+<div class="card shadow-sm mb-4 bg-light">
+    <div class="card-body py-3">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-md-4">
+                <label class="form-label fw-bold small">상품명</label>
+                <input type="text" name="name" class="form-control" value="{{ request.GET.name }}" placeholder="상품명 검색">
+            </div>
+
+            <div class="col-md-3">
+                <label class="form-label fw-bold small">카테고리</label>
+                <select name="category" class="form-select">
+                    <option value="">전체 카테고리</option>
+                    {% for key, value in categories %}
+                        <option value="{{ key }}" {% if request.GET.category == key %}selected{% endif %}>
+                            {{ value }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="col-md-3">
+                <label class="form-label fw-bold small">보관 타입</label>
+                <select name="storage" class="form-select">
+                    <option value="">전체 타입</option>
+                    {% for key, value in storages %}
+                        <option value="{{ key }}" {% if request.GET.storage == key %}selected{% endif %}>
+                            {{ value }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="col-md-2 d-flex gap-2">
+                <button type="submit" class="btn btn-secondary flex-fill">
+                    <i class="bi bi-search"></i> 조회
+                </button>
+                <a href="{% url 'fulfillment:product_list' %}" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-counterclockwise"></i>
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
 <div class="card shadow-sm mt-3">
     <div class="card-body p-0">
         <table class="table table-hover align-middle mb-0">

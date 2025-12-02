@@ -10,6 +10,36 @@
     </button>
 </div>
 
+<div class="card shadow-sm mb-4 bg-light">
+    <div class="card-body py-3">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-md-4">
+                <label class="form-label fw-bold small">상호명</label>
+                <input type="text" name="name" class="form-control" value="{{ request.GET.name }}" placeholder="상호명 검색">
+            </div>
+
+            <div class="col-md-3">
+                <label class="form-label fw-bold small">거래처 구분</label>
+                <select name="partner_type" class="form-select">
+                    <option value="">전체 보기</option>
+                    <option value="SUPPLIER" {% if request.GET.partner_type == 'SUPPLIER' %}selected{% endif %}>매입처 (공급사)</option>
+                    <option value="CLIENT" {% if request.GET.partner_type == 'CLIENT' %}selected{% endif %}>매출처 (납품처)</option>
+                    <option value="BOTH" {% if request.GET.partner_type == 'BOTH' %}selected{% endif %}>혼합</option>
+                </select>
+            </div>
+
+            <div class="col-md-3 d-flex gap-2">
+                <button type="submit" class="btn btn-secondary flex-fill">
+                    <i class="bi bi-search"></i> 조회
+                </button>
+                <a href="{% url 'fulfillment:partner_list' %}" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-counterclockwise"></i>
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
 <div class="card shadow-sm mt-3">
     <div class="card-body p-0">
         <table class="table table-hover align-middle mb-0" style="font-size: 0.95rem;">

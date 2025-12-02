@@ -1,9 +1,42 @@
 {% extends 'base.html' %}
 {% load humanize %}
+
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-3">
     <h2>💰 급여 대장</h2>
-    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addModal"><i class="bi bi-plus-lg"></i> 급여 지급</button>
+    
+    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addModal">
+        <i class="bi bi-plus-lg"></i> 급여 지급
+    </button>
+</div>
+
+<div class="card shadow-sm mb-4 bg-light">
+    <div class="card-body py-3">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-md-4">
+                <label class="form-label fw-bold small">지급일자 범위</label>
+                <div class="input-group">
+                    <input type="date" name="start_date" class="form-control" value="{{ request.GET.start_date }}">
+                    <span class="input-group-text">~</span>
+                    <input type="date" name="end_date" class="form-control" value="{{ request.GET.end_date }}">
+                </div>
+            </div>
+
+            <div class="col-md-3">
+                <label class="form-label fw-bold small">직원명</label>
+                <input type="text" name="emp_name" class="form-control" value="{{ request.GET.emp_name }}" placeholder="이름 검색">
+            </div>
+
+            <div class="col-md-3 d-flex gap-2">
+                <button type="submit" class="btn btn-secondary flex-fill">
+                    <i class="bi bi-search"></i> 조회
+                </button>
+                <a href="{% url 'fulfillment:payroll_list' %}" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-counterclockwise"></i>
+                </a>
+            </div>
+        </form>
+    </div>
 </div>
 <div class="card shadow-sm mt-3">
     <table class="table table-hover align-middle mb-0" style="font-size: 0.9rem;">
