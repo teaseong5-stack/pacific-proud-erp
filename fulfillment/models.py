@@ -2,7 +2,7 @@ from django.db import models
 from django.utils import timezone
 from django.db.models import Sum
 
-# --- 1. 기초 정보 (Enum) ---
+# --- 1. 기초 정보 (Enum 정의) ---
 class StorageType(models.TextChoices):
     DRY = 'DRY', '상온 (Dry)'
     COLD = 'COLD', '냉장 (Cold)'
@@ -31,20 +31,48 @@ class ExpenseCategory(models.TextChoices):
     TAX = 'TAX', '세금과공과'
     ETC = 'ETC', '기타'
 
-# --- 2. 기초 모델 ---
+# --- 2. 자금 관리 (통장) ★ 순서 상단 이동! ---
+class BankAccount(models.Model):
+    """법인 통장 계좌"""
+    bank_name = models.CharField(max_length=50, verbose_name="은행명")
+    account_number = models.CharField(max_length=50, verbose_name="계좌번호")
+    account_holder = models.CharField(max_length=50, verbose_name="예금주", default="(주)퍼시픽프라우드")
+    initial_balance = models.DecimalField(max_digits=15, decimal_places=0, default=0, verbose_name="기초 잔액")
+    is_active = models.BooleanField(default=True, verbose_name="사용 중")
+
+    def __str__(self):
+        return f"{self.bank_name} ({self.account_number})"
+
+    @property
+    def current_balance(self):
+        in_total = self.transactions.filter(transaction_type='DEPOSIT').aggregate(s=Sum('amount'))['s'] or 0
+        out_total = self.transactions.filter(transaction_type='WITHDRAWAL').aggregate(s=Sum('amount'))['s'] or 0
+        return self.initial_balance + in_total - out_total
+
+# Expense 모델은 BankTransaction과 서로 참조하므로 문자열 참조('Expense')를 사용해야 함
+class BankTransaction(models.Model):
+    """통장 입출금 내역"""
+    TYPE_CHOICES = [('DEPOSIT', '입금'), ('WITHDRAWAL', '출금')]
+    bank_account = models.ForeignKey(BankAccount, on_delete=models.CASCADE, related_name='transactions', verbose_name="계좌")
+    date = models.DateField(default=timezone.now, verbose_name="거래일")
+    transaction_type = models.CharField(max_length=20, choices=TYPE_CHOICES, verbose_name="구분")
+    amount = models.DecimalField(max_digits=15, decimal_places=0, verbose_name="금액")
+    description = models.CharField(max_length=100, verbose_name="적요")
+    related_expense = models.OneToOneField('Expense', on_delete=models.SET_NULL, null=True, blank=True, related_name='bank_trx')
+
+    def __str__(self):
+        return f"[{self.get_transaction_type_display()}] {self.amount} - {self.description}"
+
+# --- 3. 거래처 및 창고 ---
 class Partner(models.Model):
-    """거래처 관리 (CRM/SRM)"""
     name = models.CharField(max_length=100, verbose_name="상호명")
     partner_type = models.CharField(max_length=10, choices=PartnerType.choices, verbose_name="구분")
     biz_number = models.CharField(max_length=20, verbose_name="사업자번호", blank=True, null=True)
     owner_name = models.CharField(max_length=50, verbose_name="대표자명", blank=True, null=True)
     phone = models.CharField(max_length=20, verbose_name="대표 전화번호", blank=True, null=True)
     address = models.CharField(max_length=200, verbose_name="주소", blank=True, null=True)
-    
-    # ★ 추가된 필드: 실무 담당자 정보
     contact_person = models.CharField(max_length=50, verbose_name="담당자명", blank=True, null=True)
     contact_phone = models.CharField(max_length=20, verbose_name="담당자 연락처", blank=True, null=True)
-    
     initial_balance = models.DecimalField(max_digits=12, decimal_places=0, default=0, verbose_name="기초 미수/미지급금")
 
     def __str__(self):
@@ -52,7 +80,6 @@ class Partner(models.Model):
 
     @property
     def current_balance(self):
-        # (기존 잔액 계산 로직 그대로 유지)
         if self.partner_type == 'CLIENT':
             total_trade = self.order_set.filter(status='SHIPPED').aggregate(s=Sum('total_revenue'))['s'] or 0
             total_paid = self.payment_set.aggregate(s=Sum('amount'))['s'] or 0
@@ -74,6 +101,7 @@ class Location(models.Model):
     is_active = models.BooleanField(default=True)
     def __str__(self): return self.code
 
+# --- 4. 상품 (Product) ---
 class Product(models.Model):
     sku = models.CharField(max_length=50, unique=True)
     name = models.CharField(max_length=100)
@@ -86,7 +114,7 @@ class Product(models.Model):
     is_taxable = models.BooleanField(default=True)
     def __str__(self): return self.name
 
-# --- 3. 매입/재고 ---
+# --- 5. 매입/재고 ---
 class Purchase(models.Model):
     supplier = models.ForeignKey(Partner, on_delete=models.PROTECT, limit_choices_to={'partner_type__in': ['SUPPLIER', 'BOTH']})
     purchase_date = models.DateField(default=timezone.now)
@@ -117,27 +145,17 @@ class Inventory(models.Model):
     def is_expired(self): return self.expiry_date < timezone.now().date()
     def __str__(self): return f"{self.product.name} ({self.quantity})"
 
-# --- 4. 매출/주문 (여기가 에러 원인!) ---
+# --- 6. 매출/주문 ---
 class Order(models.Model):
-    """주문 헤더"""
-    client = models.ForeignKey(Partner, on_delete=models.PROTECT, limit_choices_to={'partner_type__in': ['CLIENT', 'BOTH']}, verbose_name="납품처", null=True)
+    client = models.ForeignKey(Partner, on_delete=models.PROTECT, limit_choices_to={'partner_type__in': ['CLIENT', 'BOTH']}, null=True)
     order_date = models.DateTimeField(auto_now_add=True)
     status = models.CharField(max_length=20, choices=[('PENDING', '접수'), ('ALLOCATED', '피킹지시'), ('SHIPPED', '출고완료')], default='PENDING')
-    
-    # ★ 추가된 필드: 주문 메모
-    memo = models.CharField(max_length=200, blank=True, null=True, verbose_name="주문 메모")
-
-    # 손익 분석용 스냅샷 필드
-    total_revenue = models.DecimalField(max_digits=12, decimal_places=0, default=0, verbose_name="총 매출액")
-    total_cogs = models.DecimalField(max_digits=12, decimal_places=0, default=0, verbose_name="총 원가(COGS)")
-
-    def __str__(self):
-        client_name = self.client.name if self.client else "미지정"
-        return f"주문 #{self.id} - {client_name}"
-
+    memo = models.CharField(max_length=200, blank=True, null=True)
+    total_revenue = models.DecimalField(max_digits=12, decimal_places=0, default=0)
+    total_cogs = models.DecimalField(max_digits=12, decimal_places=0, default=0)
+    def __str__(self): return f"주문 #{self.id}"
     @property
-    def gross_profit(self):
-        return self.total_revenue - self.total_cogs
+    def gross_profit(self): return self.total_revenue - self.total_cogs
 
 class OrderItem(models.Model):
     order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='items')
@@ -159,76 +177,67 @@ class PickingList(models.Model):
     picked = models.BooleanField(default=False)
     picked_weight = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
 
-# --- 5. 비용 & 인사 & 자금 ---
+# --- 7. 재무/회계 (Expense) ★ BankAccount 참조 가능! ---
 class Expense(models.Model):
-    date = models.DateField(default=timezone.now)
-    category = models.CharField(max_length=20, choices=ExpenseCategory.choices)
-    description = models.CharField(max_length=100)
-    amount = models.DecimalField(max_digits=12, decimal_places=0)
-    has_proof = models.BooleanField(default=True)
-    def __str__(self): return f"{self.description}"
-
-# --- 7. 인사/급여 (HR) ---
-class Employee(models.Model):
-    """직원 정보"""
-    name = models.CharField(max_length=50, verbose_name="성명")
-    position = models.CharField(max_length=50, verbose_name="직급")
-    department = models.CharField(max_length=50, verbose_name="부서", default="물류팀")
-    join_date = models.DateField(verbose_name="입사일")
-    # ★ 이 부분이 빠져서 에러가 난 것입니다!
-    resignation_date = models.DateField(verbose_name="퇴사일", null=True, blank=True)
-    
-    base_salary = models.DecimalField(max_digits=12, decimal_places=0, verbose_name="기본급 (VND)")
-    is_active = models.BooleanField(default=True, verbose_name="재직 여부")
-
-    def __str__(self):
-        return f"{self.name} ({self.position})"
-
-class Payroll(models.Model):
-    """월 급여 대장"""
-    employee = models.ForeignKey(Employee, on_delete=models.PROTECT, verbose_name="직원")
-    payment_date = models.DateField(default=timezone.now, verbose_name="지급일")
-    month_label = models.CharField(max_length=20, verbose_name="귀속월")
-    
-    # 급여 상세
-    base_pay = models.DecimalField(max_digits=12, decimal_places=0, verbose_name="기본급")
-    bonus = models.DecimalField(max_digits=12, decimal_places=0, default=0, verbose_name="성과급")
-    # ★ 이 부분도 추가되어야 합니다!
-    leave_pay = models.DecimalField(max_digits=12, decimal_places=0, default=0, verbose_name="수당(년/월차)")
-    deduction = models.DecimalField(max_digits=12, decimal_places=0, default=0, verbose_name="차감액(세금/보험)")
-    
-    total_amount = models.DecimalField(max_digits=12, decimal_places=0, default=0, verbose_name="실수령액")
-    
-    # 회계 자동 연동
-    related_expense = models.OneToOneField('Expense', on_delete=models.SET_NULL, null=True, blank=True, editable=False)
+    date = models.DateField(default=timezone.now, verbose_name="지출일자")
+    category = models.CharField(max_length=20, choices=ExpenseCategory.choices, verbose_name="계정과목")
+    description = models.CharField(max_length=100, verbose_name="적요 (내용)")
+    amount = models.DecimalField(max_digits=12, decimal_places=0, verbose_name="지출금액")
+    has_proof = models.BooleanField(default=True, verbose_name="적격증빙 유무")
+    payment_account = models.ForeignKey(BankAccount, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="출금 계좌")
 
     def save(self, *args, **kwargs):
-        # 실수령액 자동 계산
+        super().save(*args, **kwargs)
+        if self.payment_account:
+            if hasattr(self, 'bank_trx') and self.bank_trx:
+                self.bank_trx.bank_account = self.payment_account
+                self.bank_trx.date = self.date
+                self.bank_trx.amount = self.amount
+                self.bank_trx.description = f"[지출] {self.description}"
+                self.bank_trx.save()
+            else:
+                BankTransaction.objects.create(
+                    bank_account=self.payment_account, date=self.date, transaction_type='WITHDRAWAL',
+                    amount=self.amount, description=f"[지출] {self.description}", related_expense=self
+                )
+    def __str__(self): return f"[{self.get_category_display()}] {self.description}"
+
+# --- 8. 인사/급여 (HR) ---
+class Employee(models.Model):
+    name = models.CharField(max_length=50)
+    position = models.CharField(max_length=50)
+    department = models.CharField(max_length=50, default="물류팀")
+    join_date = models.DateField()
+    resignation_date = models.DateField(null=True, blank=True)
+    base_salary = models.DecimalField(max_digits=12, decimal_places=0)
+    is_active = models.BooleanField(default=True)
+    def __str__(self): return self.name
+
+class Payroll(models.Model):
+    employee = models.ForeignKey(Employee, on_delete=models.PROTECT)
+    payment_date = models.DateField(default=timezone.now)
+    month_label = models.CharField(max_length=20)
+    base_pay = models.DecimalField(max_digits=12, decimal_places=0)
+    bonus = models.DecimalField(max_digits=12, decimal_places=0, default=0)
+    leave_pay = models.DecimalField(max_digits=12, decimal_places=0, default=0)
+    deduction = models.DecimalField(max_digits=12, decimal_places=0, default=0)
+    total_amount = models.DecimalField(max_digits=12, decimal_places=0, default=0)
+    related_expense = models.OneToOneField(Expense, on_delete=models.SET_NULL, null=True, blank=True, editable=False)
+
+    def save(self, *args, **kwargs):
         self.total_amount = (self.base_pay + self.bonus + self.leave_pay) - self.deduction
         super().save(*args, **kwargs)
         
-        # 비용 자동 생성/수정 로직
-        from .models import Expense, ExpenseCategory
         description = f"급여 지급 - {self.employee.name} ({self.month_label})"
-        
         if self.related_expense:
             self.related_expense.amount = self.total_amount
             self.related_expense.date = self.payment_date
             self.related_expense.description = description
             self.related_expense.save()
         else:
-            exp = Expense.objects.create(
-                date=self.payment_date, 
-                category=ExpenseCategory.SALARY, 
-                description=description, 
-                amount=self.total_amount, 
-                has_proof=True
-            )
+            exp = Expense.objects.create(date=self.payment_date, category=ExpenseCategory.SALARY, description=description, amount=self.total_amount, has_proof=True)
             self.related_expense = exp
             super().save(update_fields=['related_expense'])
-
-    def __str__(self):
-        return f"{self.employee.name} - {self.month_label}"
 
 class Payment(models.Model):
     PAYMENT_TYPE = [('INBOUND', '수금'), ('OUTBOUND', '지급')]
@@ -239,22 +248,23 @@ class Payment(models.Model):
     method = models.CharField(max_length=20, default='CASH', choices=[('CASH','현금'), ('BANK','계좌'), ('CARD','카드')])
     memo = models.CharField(max_length=100, blank=True)
     def __str__(self): return f"{self.partner.name} - {self.amount}"
-    
-class CompanyInfo(models.Model):
-    """우리 회사 정보 (명세서 출력용)"""
-    name = models.CharField(max_length=100, verbose_name="상호명", default="우리회사")
-    biz_number = models.CharField(max_length=20, verbose_name="사업자번호", blank=True)
-    ceo_name = models.CharField(max_length=50, verbose_name="대표자명", blank=True)
-    address = models.CharField(max_length=200, verbose_name="사업장 주소", blank=True)
-    phone = models.CharField(max_length=20, verbose_name="대표 전화", blank=True)
-    bank_account = models.CharField(max_length=100, verbose_name="입금 계좌번호", blank=True, help_text="예: 국민은행 000-000-000000")
 
+class WorkLog(models.Model):
+    date = models.DateField(default=timezone.now)
+    employee = models.ForeignKey(Employee, on_delete=models.CASCADE)
+    content = models.TextField()
+    issues = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    def __str__(self): return f"{self.date} - {self.employee.name}"
+
+class CompanyInfo(models.Model):
+    name = models.CharField(max_length=100, default="우리회사")
+    biz_number = models.CharField(max_length=20, blank=True)
+    ceo_name = models.CharField(max_length=50, blank=True)
+    address = models.CharField(max_length=200, blank=True)
+    phone = models.CharField(max_length=20, blank=True)
+    bank_account = models.CharField(max_length=100, blank=True)
     def save(self, *args, **kwargs):
-        # 데이터가 1개만 존재하도록 강제함 (싱글톤 패턴 흉내)
         if not self.pk and CompanyInfo.objects.exists():
-            # 이미 데이터가 있으면, 기존 것의 ID를 가져와서 덮어쓰기
             self.pk = CompanyInfo.objects.first().pk
         super().save(*args, **kwargs)
-
-    def __str__(self):
-        return "우리 회사 정보"    

@@ -71,7 +71,20 @@ urlpatterns = [
     path('export/inventory/', views.export_inventory_excel, name='export_inventory'),
     path('export/purchase/', views.export_purchase_excel, name='export_purchase'),
     path('export/order/', views.export_order_excel, name='export_order'),
+    
     # 인증 관련 (가입/탈퇴)
     path('signup/', views.signup, name='signup'),
     path('delete_account/', views.delete_account, name='delete_account'),
+    
+    # 통장 관리
+    path('bank/', views.bank_list, name='bank_list'),
+    path('bank/create/', views.bank_create, name='bank_create'),
+    path('bank/<int:pk>/', views.bank_detail, name='bank_detail'),
+    path('bank/transaction/create/', views.bank_transaction_create, name='bank_transaction_create'),
+
+    # 업무 일지
+    path('worklog/', views.worklog_list, name='worklog_list'),
+    path('worklog/create/', views.worklog_create, name='worklog_create'),
+    path('worklog/update/<int:pk>/', views.worklog_update, name='worklog_update'),
+    path('worklog/delete/<int:pk>/', views.worklog_delete, name='worklog_delete'),
    ]

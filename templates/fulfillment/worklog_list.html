@@ -1,0 +1,95 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2>📔 업무 일지</h2>
+    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addLogModal">
+        <i class="bi bi-pencil"></i> 일지 작성
+    </button>
+</div>
+
+<div class="card bg-light mb-4 shadow-sm">
+    <div class="card-body py-2">
+        <form method="get" class="d-flex gap-2 align-items-center">
+            <label class="fw-bold me-2">날짜 조회:</label>
+            <input type="date" name="date" class="form-control w-auto" value="{{ request.GET.date }}">
+            <button type="submit" class="btn btn-secondary btn-sm">조회</button>
+            <a href="{% url 'fulfillment:worklog_list' %}" class="btn btn-outline-secondary btn-sm">전체보기</a>
+        </form>
+    </div>
+</div>
+
+<div class="row g-3">
+    {% for log in logs %}
+    <div class="col-md-6 col-lg-4">
+        <div class="card shadow-sm h-100">
+            <div class="card-header d-flex justify-content-between align-items-center bg-white">
+                <div>
+                    <span class="badge bg-info text-dark me-1">{{ log.date|date:"m-d" }}</span>
+                    <span class="fw-bold">{{ log.employee.name }}</span>
+                </div>
+                <div>
+                    <a href="{% url 'fulfillment:worklog_update' log.id %}" class="btn btn-sm btn-link text-muted p-0"><i class="bi bi-pencil"></i></a>
+                    <a href="{% url 'fulfillment:worklog_delete' log.id %}" class="btn btn-sm btn-link text-danger p-0 ms-2"><i class="bi bi-trash"></i></a>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="card-text" style="white-space: pre-line; min-height: 80px;">{{ log.content }}</div>
+                
+                {% if log.issues %}
+                <div class="alert alert-warning py-2 mb-0 mt-3 small d-flex">
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                    <div>{{ log.issues }}</div>
+                </div>
+                {% endif %}
+            </div>
+            <div class="card-footer bg-light text-muted small text-end">
+                작성: {{ log.created_at|date:"Y-m-d H:i" }}
+            </div>
+        </div>
+    </div>
+    {% empty %}
+    <div class="col-12 text-center p-5 text-muted">
+        작성된 업무 일지가 없습니다.
+    </div>
+    {% endfor %}
+</div>
+
+<div class="modal fade" id="addLogModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title">📔 업무 일지 작성</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" action="{% url 'fulfillment:worklog_create' %}">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-6">
+                            <label class="form-label fw-bold">날짜</label>
+                            {{ form.date }}
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label fw-bold">작성자</label>
+                            {{ form.employee }}
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-bold">업무 내용</label>
+                            {{ form.content }}
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-bold text-danger">특이사항 / 이슈</label>
+                            {{ form.issues }}
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">취소</button>
+                    <button type="submit" class="btn btn-primary">저장</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,38 +1,34 @@
 from django import forms
-from django.forms import inlineformset_factory  # ★ 이 줄이 꼭 있어야 합니다!
+from django.forms import inlineformset_factory
+from django.contrib.auth.forms import UserCreationForm
+from django.contrib.auth.models import User
+
+# ★ 모든 모델을 한 번에 다 가져와야 합니다!
 from .models import (
     Inventory, Product, Location, Partner, Purchase, PurchaseItem, 
-    Order, OrderItem, Employee, Payroll, Expense, Payment, CompanyInfo)
-from django.contrib.auth.forms import UserCreationForm
-from django.contrib.auth.models import User    
+    Order, OrderItem, Employee, Payroll, Expense, Payment, CompanyInfo,
+    BankAccount, BankTransaction, WorkLog
+)
 
-# 1. 물류/재고 폼
+# --- 회원가입 폼 ---
+class SignUpForm(UserCreationForm):
+    class Meta:
+        model = User
+        fields = ['username', 'email', 'first_name', 'last_name']
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field in self.fields.values():
+            field.widget.attrs['class'] = 'form-control'
+
+# --- 물류 폼 ---
 class InboundForm(forms.ModelForm):
-    """입고 등록 폼 (UI 개선용)"""
+    product = forms.ModelChoiceField(queryset=Product.objects.all(), widget=forms.Select(attrs={'class': 'form-select search-select'}))
+    location = forms.ModelChoiceField(queryset=Location.objects.filter(is_active=True), widget=forms.Select(attrs={'class': 'form-select search-select'}))
+    quantity = forms.IntegerField(widget=forms.NumberInput(attrs={'class': 'form-control'}))
+    expiry_date = forms.DateField(widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}))
     class Meta:
         model = Inventory
         fields = ['product', 'location', 'quantity', 'expiry_date']
-        widgets = {
-            'product': forms.Select(attrs={
-                'class': 'form-select search-select', # select2 적용
-                'data-placeholder': '상품을 검색하세요 (이름 또는 SKU)',
-                'style': 'width: 100%;'
-            }),
-            'location': forms.Select(attrs={
-                'class': 'form-select search-select',
-                'data-placeholder': '적치 위치 선택',
-                'style': 'width: 100%;'
-            }),
-            'quantity': forms.NumberInput(attrs={
-                'class': 'form-control form-control-lg fw-bold text-end', # 크고 굵게
-                'placeholder': '0',
-                'min': '1'
-            }),
-            'expiry_date': forms.DateInput(attrs={
-                'type': 'date',
-                'class': 'form-control form-control-lg text-center'
-            }),
-        }
 
 class InventoryForm(forms.ModelForm):
     class Meta:
@@ -46,7 +42,7 @@ class InventoryForm(forms.ModelForm):
             'batch_number': forms.TextInput(attrs={'class': 'form-control'}),
         }
 
-# 2. 기초 정보 폼
+# --- 기초 정보 폼 ---
 class ProductForm(forms.ModelForm):
     class Meta:
         model = Product
@@ -92,17 +88,18 @@ class CompanyInfoForm(forms.ModelForm):
             'bank_account': forms.TextInput(attrs={'class': 'form-control'}),
         }
 
-# 3. 인사/급여/재무 폼
+# --- 재무/인사 폼 ---
 class ExpenseForm(forms.ModelForm):
     class Meta:
         model = Expense
-        fields = ['date', 'category', 'description', 'amount', 'has_proof']
+        fields = ['date', 'category', 'description', 'amount', 'has_proof', 'payment_account']
         widgets = {
             'date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
             'category': forms.Select(attrs={'class': 'form-select'}),
             'description': forms.TextInput(attrs={'class': 'form-control'}),
             'amount': forms.NumberInput(attrs={'class': 'form-control'}),
             'has_proof': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'payment_account': forms.Select(attrs={'class': 'form-select'}),
         }
 
 class EmployeeForm(forms.ModelForm):
@@ -133,7 +130,43 @@ class PayrollForm(forms.ModelForm):
             'deduction': forms.NumberInput(attrs={'class': 'form-control'}),
         }
 
-# 4. 발주/주문 (헤더 및 폼셋)
+# --- 자금/업무일지 폼 (★ BankTransactionForm 포함) ---
+class BankAccountForm(forms.ModelForm):
+    class Meta:
+        model = BankAccount
+        fields = ['bank_name', 'account_number', 'account_holder', 'initial_balance', 'is_active']
+        widgets = {
+            'bank_name': forms.TextInput(attrs={'class': 'form-control'}),
+            'account_number': forms.TextInput(attrs={'class': 'form-control'}),
+            'account_holder': forms.TextInput(attrs={'class': 'form-control'}),
+            'initial_balance': forms.NumberInput(attrs={'class': 'form-control'}),
+            'is_active': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+        }
+
+class BankTransactionForm(forms.ModelForm):
+    class Meta:
+        model = BankTransaction
+        fields = ['bank_account', 'date', 'transaction_type', 'amount', 'description']
+        widgets = {
+            'bank_account': forms.Select(attrs={'class': 'form-select'}),
+            'date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+            'transaction_type': forms.Select(attrs={'class': 'form-select'}),
+            'amount': forms.NumberInput(attrs={'class': 'form-control'}),
+            'description': forms.TextInput(attrs={'class': 'form-control'}),
+        }
+
+class WorkLogForm(forms.ModelForm):
+    class Meta:
+        model = WorkLog
+        fields = ['date', 'employee', 'content', 'issues']
+        widgets = {
+            'date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+            'employee': forms.Select(attrs={'class': 'form-select'}),
+            'content': forms.Textarea(attrs={'class': 'form-control', 'rows': 5}),
+            'issues': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
+        }
+
+# --- 발주/주문 폼셋 ---
 class PurchaseForm(forms.ModelForm):
     class Meta:
         model = Purchase
@@ -144,19 +177,6 @@ class PurchaseForm(forms.ModelForm):
             'status': forms.Select(attrs={'class': 'form-select'}),
             'is_bill_published': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         }
-
-class OrderForm(forms.ModelForm):
-    """주문 수정 폼"""
-    class Meta:
-        model = Order
-        fields = ['client', 'status', 'memo'] # ★ memo 추가됨
-        widgets = {
-            'client': forms.Select(attrs={'class': 'form-select'}),
-            'status': forms.Select(attrs={'class': 'form-select'}),
-            'memo': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '배송 요청사항 등 메모 입력'}),
-        }
-
-# ★ 아래 폼셋(FormSet) 정의가 반드시 있어야 합니다!
 class PurchaseItemForm(forms.ModelForm):
     class Meta:
         model = PurchaseItem
@@ -167,12 +187,17 @@ class PurchaseItemForm(forms.ModelForm):
             'target_location': forms.Select(attrs={'class': 'form-select'}),
             'expiry_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
         }
+PurchaseCreateFormSet = inlineformset_factory(Purchase, PurchaseItem, form=PurchaseItemForm, extra=5, can_delete=True)
 
-PurchaseCreateFormSet = inlineformset_factory(
-    Purchase, PurchaseItem, form=PurchaseItemForm,
-    extra=5, can_delete=True
-)
-
+class OrderForm(forms.ModelForm):
+    class Meta:
+        model = Order
+        fields = ['client', 'status', 'memo']
+        widgets = {
+            'client': forms.Select(attrs={'class': 'form-select'}),
+            'status': forms.Select(attrs={'class': 'form-select'}),
+            'memo': forms.TextInput(attrs={'class': 'form-control'}),
+        }
 class OrderItemForm(forms.ModelForm):
     class Meta:
         model = OrderItem
@@ -181,20 +206,4 @@ class OrderItemForm(forms.ModelForm):
             'product': forms.Select(attrs={'class': 'form-select product-select', 'onchange': 'updateRow(this)'}),
             'quantity': forms.NumberInput(attrs={'class': 'form-control quantity-input', 'oninput': 'updateRow(this)'}),
         }
-
-OrderCreateFormSet = inlineformset_factory(
-    Order, OrderItem, form=OrderItemForm,
-    extra=5, can_delete=True
-)
-
-class SignUpForm(UserCreationForm):
-    """회원가입 폼 (Bootstrap 적용)"""
-    class Meta:
-        model = User
-        fields = ['username', 'email', 'first_name', 'last_name'] # ID, 이메일, 이름 입력
-        
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        # 모든 필드에 부트스트랩 스타일 적용
-        for field in self.fields.values():
-            field.widget.attrs['class'] = 'form-control'
+OrderCreateFormSet = inlineformset_factory(Order, OrderItem, form=OrderItemForm, extra=5, can_delete=True)

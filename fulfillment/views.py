@@ -6,26 +6,44 @@ from datetime import timedelta
 from django.http import HttpResponse
 from django.template.loader import render_to_string
 from decimal import Decimal
-# 회원가입용 Import
-from django.contrib.auth import login
-from .forms import SignUpForm
+from django.contrib.auth import login # ★ 로그인 기능 추가
 
-# ★ 모델 전체 임포트
+# 모델 전체 임포트
 from .models import (
     Partner, Product, Purchase, Inventory, Order, OrderItem, 
     PickingList, Expense, Employee, Payroll, Payment, Zone, Location,
-    CompanyInfo
+    CompanyInfo, BankAccount, BankTransaction, WorkLog
 )
-# ★ 폼 전체 임포트 (EmployeeForm, PayrollForm 등 모두 포함)
+# 폼 전체 임포트 (SignUpForm 추가됨)
 from .forms import (
     InboundForm, ProductForm, PartnerForm, 
     InventoryForm, PurchaseForm, OrderForm,
     ExpenseForm, EmployeeForm, PayrollForm, CompanyInfoForm,
-    PurchaseCreateFormSet, OrderCreateFormSet
+    BankAccountForm, WorkLogForm, SignUpForm,
+    PurchaseCreateFormSet, OrderCreateFormSet, BankTransactionForm
 )
 from .utils import generate_barcode_image, export_to_excel
 
-# --- 1. 대시보드 (CEO 모드) ---
+# --- 0. 인증 (회원가입/탈퇴) ★ 추가된 부분 ---
+def signup(request):
+    if request.method == 'POST':
+        form = SignUpForm(request.POST)
+        if form.is_valid():
+            user = form.save()
+            login(request, user) # 가입 즉시 로그인
+            return redirect('fulfillment:dashboard')
+    else:
+        form = SignUpForm()
+    return render(request, 'registration/signup.html', {'form': form})
+
+def delete_account(request):
+    if request.method == 'POST':
+        user = request.user
+        user.delete()
+        return redirect('login')
+    return render(request, 'registration/delete_account.html')
+
+# --- 1. 대시보드 ---
 def dashboard(request):
     today = timezone.now().date()
     this_month_start = today.replace(day=1)
@@ -74,7 +92,6 @@ def dashboard(request):
 
 # --- 2. 물류 프로세스 ---
 def inbound_create(request):
-    """신규 입고 등록 (상세 정보 연동 수정)"""
     if request.method == 'POST':
         form = InboundForm(request.POST)
         if form.is_valid():
@@ -83,17 +100,10 @@ def inbound_create(request):
             inv.save()
             return redirect('fulfillment:print_label', inventory_id=inv.id)
     else:
-        # 기본 유통기한 1년 후로 설정
         form = InboundForm(initial={'expiry_date': timezone.now().date() + timedelta(days=365)})
-
-    # ★ 이 부분이 빠져서 상세 정보가 안 떴던 것입니다!
-    # 자바스크립트가 참조할 상품 전체 데이터를 템플릿으로 넘겨줍니다.
-    products = Product.objects.all()
     
-    return render(request, 'fulfillment/inbound_form.html', {
-        'form': form,
-        'products': products  # ★ 필수 전달 데이터
-    })
+    products = Product.objects.all()
+    return render(request, 'fulfillment/inbound_form.html', {'form': form, 'products': products})
 
 def print_label(request, inventory_id):
     inv = get_object_or_404(Inventory, id=inventory_id)
@@ -178,50 +188,7 @@ def monthly_report(request):
     }
     return render(request, 'fulfillment/monthly_report.html', context)
 
-# --- 5. 조회 및 관리 (엑셀 다운로드 포함) ---
-
-def export_inventory_excel(request):
-    queryset = Inventory.objects.filter(quantity__gt=0).select_related('product', 'location__zone').order_by('product__name')
-    p_name = request.GET.get('p_name')
-    sku = request.GET.get('sku')
-    loc_id = request.GET.get('location')
-    s_date = request.GET.get('start_date')
-    e_date = request.GET.get('end_date')
-    if p_name: queryset = queryset.filter(product__name__icontains=p_name)
-    if sku: queryset = queryset.filter(product__sku__icontains=sku)
-    if loc_id: queryset = queryset.filter(location_id=loc_id)
-    if s_date: queryset = queryset.filter(expiry_date__gte=s_date)
-    if e_date: queryset = queryset.filter(expiry_date__lte=e_date)
-    columns = [('상품명', 'product__name'), ('SKU', 'product__sku'), ('위치', 'location__code'), ('수량', 'quantity'), ('유통기한', 'expiry_date')]
-    return export_to_excel(queryset, 'Inventory_List', columns)
-
-def export_purchase_excel(request):
-    queryset = Purchase.objects.select_related('supplier').order_by('-purchase_date')
-    start_date = request.GET.get('start_date')
-    end_date = request.GET.get('end_date')
-    supplier_id = request.GET.get('supplier')
-    status = request.GET.get('status')
-    if start_date: queryset = queryset.filter(purchase_date__gte=start_date)
-    if end_date: queryset = queryset.filter(purchase_date__lte=end_date)
-    if supplier_id: queryset = queryset.filter(supplier_id=supplier_id)
-    if status: queryset = queryset.filter(status=status)
-    columns = [('매입번호', 'id'), ('공급사', 'supplier__name'), ('매입일자', 'purchase_date'), ('총금액', 'total_amount'), ('상태', 'get_status_display')]
-    return export_to_excel(queryset, 'Purchase_List', columns)
-
-def export_order_excel(request):
-    queryset = Order.objects.select_related('client').order_by('-order_date')
-    start_date = request.GET.get('start_date')
-    end_date = request.GET.get('end_date')
-    client_id = request.GET.get('client')
-    status = request.GET.get('status')
-    if start_date: queryset = queryset.filter(order_date__date__gte=start_date)
-    if end_date: queryset = queryset.filter(order_date__date__lte=end_date)
-    if client_id: queryset = queryset.filter(client_id=client_id)
-    if status: queryset = queryset.filter(status=status)
-    columns = [('주문번호', 'id'), ('납품처', 'client__name'), ('주문일시', 'order_date'), ('매출액', 'total_revenue'), ('상태', 'get_status_display')]
-    return export_to_excel(queryset, 'Order_List', columns)
-
-# --- 6. 리스트 화면 뷰 ---
+# --- 5. 조회 및 관리 리스트 (검색/엑셀 포함) ---
 
 def inventory_list(request):
     inventories = Inventory.objects.filter(quantity__gt=0).select_related('product', 'location__zone').order_by('product__name')
@@ -237,7 +204,6 @@ def inventory_list(request):
     if e_date: inventories = inventories.filter(expiry_date__lte=e_date)
     locations = Location.objects.filter(is_active=True).select_related('zone').order_by('zone__name', 'code')
     return render(request, 'fulfillment/inventory_list.html', {'inventories': inventories, 'locations': locations})
-
 def inventory_update(request, pk):
     obj = get_object_or_404(Inventory, pk=pk)
     if request.method == 'POST':
@@ -245,7 +211,6 @@ def inventory_update(request, pk):
         if form.is_valid(): form.save(); return redirect('fulfillment:inventory_list')
     else: form = InventoryForm(instance=obj)
     return render(request, 'fulfillment/common_form.html', {'form': form, 'title': '재고 수정'})
-
 def inventory_delete(request, pk):
     obj = get_object_or_404(Inventory, pk=pk)
     if request.method == 'POST': obj.delete(); return redirect('fulfillment:inventory_list')
@@ -268,7 +233,6 @@ def purchase_list(request):
     return render(request, 'fulfillment/purchase_list.html', {
         'purchases': purchases, 'form': form, 'products_all': products_all, 'locations_all': locations_all, 'suppliers': suppliers
     })
-
 def purchase_create(request):
     if request.method == 'POST':
         form = PurchaseForm(request.POST)
@@ -284,7 +248,6 @@ def purchase_create(request):
             purchase.save()
             return redirect('fulfillment:purchase_list')
     return redirect('fulfillment:purchase_list')
-
 def purchase_update(request, pk):
     purchase = get_object_or_404(Purchase, pk=pk)
     if request.method == 'POST':
@@ -306,7 +269,6 @@ def purchase_update(request, pk):
         formset = PurchaseCreateFormSet(instance=purchase)
     context = {'form': form, 'formset': formset, 'purchase': purchase, 'products_all': Product.objects.all(), 'locations_all': Location.objects.filter(is_active=True), 'title': f'발주서 수정 (#{purchase.id})'}
     return render(request, 'fulfillment/purchase_edit.html', context)
-
 def purchase_delete(request, pk):
     obj = get_object_or_404(Purchase, pk=pk)
     if request.method == 'POST': obj.delete(); return redirect('fulfillment:purchase_list')
@@ -328,7 +290,6 @@ def order_list(request):
     return render(request, 'fulfillment/order_list.html', {
         'orders': orders, 'form': form, 'products_all': products_all, 'clients': clients
     })
-
 def order_create(request):
     if request.method == 'POST':
         form = OrderForm(request.POST)
@@ -346,7 +307,6 @@ def order_create(request):
             order.save()
             return redirect('fulfillment:order_list')
     return redirect('fulfillment:order_list')
-
 def order_update(request, pk):
     order = get_object_or_404(Order, pk=pk)
     if request.method == 'POST':
@@ -369,13 +329,10 @@ def order_update(request, pk):
         formset = OrderCreateFormSet(instance=order)
     context = {'form': form, 'formset': formset, 'order': order, 'products_all': Product.objects.all(), 'title': f'주문서 수정 (#{order.id})'}
     return render(request, 'fulfillment/order_edit.html', context)
-
 def order_delete(request, pk):
     obj = get_object_or_404(Order, pk=pk)
     if request.method == 'POST': obj.delete(); return redirect('fulfillment:order_list')
     return render(request, 'fulfillment/common_delete.html', {'object': obj, 'back_url': 'fulfillment:order_list'})
-
-# --- 기타 리스트 (검색 기능 추가) ---
 
 def expense_list(request):
     expenses = Expense.objects.order_by('-date')
@@ -408,10 +365,8 @@ def employee_list(request):
     if status_query:
         is_active = True if status_query == 'active' else False
         employees = employees.filter(is_active=is_active)
-    
     form = EmployeeForm()
     return render(request, 'fulfillment/employee_list.html', {'employees': employees, 'form': form})
-
 def employee_create(request):
     if request.method == 'POST':
         form = EmployeeForm(request.POST)
@@ -430,30 +385,15 @@ def employee_delete(request, pk):
     return render(request, 'fulfillment/common_delete.html', {'object': obj, 'back_url': 'fulfillment:employee_list'})
 
 def payroll_list(request):
-    """급여 대장 (검색 기능 추가)"""
     payrolls = Payroll.objects.select_related('employee').order_by('-payment_date')
-
-    # 1. 검색 파라미터 받기
     start_date = request.GET.get('start_date')
     end_date = request.GET.get('end_date')
     emp_name = request.GET.get('emp_name')
-
-    # 2. 필터링 적용
-    if start_date:
-        payrolls = payrolls.filter(payment_date__gte=start_date)
-    if end_date:
-        payrolls = payrolls.filter(payment_date__lte=end_date)
-    if emp_name:
-        # 직원 이름에 검색어가 포함된 경우
-        payrolls = payrolls.filter(employee__name__icontains=emp_name)
-
-    # 3. 등록 폼 (이번 달 자동 입력)
+    if start_date: payrolls = payrolls.filter(payment_date__gte=start_date)
+    if end_date: payrolls = payrolls.filter(payment_date__lte=end_date)
+    if emp_name: payrolls = payrolls.filter(employee__name__icontains=emp_name)
     form = PayrollForm(initial={'month_label': timezone.now().strftime('%Y-%m')})
-    
-    return render(request, 'fulfillment/payroll_list.html', {
-        'payrolls': payrolls, 
-        'form': form
-    })
+    return render(request, 'fulfillment/payroll_list.html', {'payrolls': payrolls, 'form': form})
 def payroll_create(request):
     if request.method == 'POST':
         form = PayrollForm(request.POST)
@@ -472,26 +412,13 @@ def payroll_delete(request, pk):
     return render(request, 'fulfillment/common_delete.html', {'object': obj, 'back_url': 'fulfillment:payroll_list'})
 
 def partner_list(request):
-    """거래처 관리 (검색 기능 추가)"""
     partners = Partner.objects.order_by('name')
-
-    # 1. 검색 파라미터 받기
     name_query = request.GET.get('name')
     type_query = request.GET.get('partner_type')
-
-    # 2. 필터링 적용
-    if name_query:
-        partners = partners.filter(name__icontains=name_query)
-    if type_query:
-        partners = partners.filter(partner_type=type_query)
-
-    # 3. 등록 팝업용 폼
+    if name_query: partners = partners.filter(name__icontains=name_query)
+    if type_query: partners = partners.filter(partner_type=type_query)
     form = PartnerForm()
-    
-    return render(request, 'fulfillment/partner_list.html', {
-        'partners': partners, 
-        'form': form
-    })
+    return render(request, 'fulfillment/partner_list.html', {'partners': partners, 'form': form})
 def partner_create(request):
     if request.method == 'POST':
         form = PartnerForm(request.POST)
@@ -510,36 +437,16 @@ def partner_delete(request, pk):
     return render(request, 'fulfillment/common_delete.html', {'object': obj, 'back_url': 'fulfillment:partner_list'})
 
 def product_list(request):
-    """상품 관리 (검색 기능 추가)"""
-    # 1. 기본 쿼리셋 (카테고리, 이름순 정렬)
     products = Product.objects.order_by('category', 'name')
-
-    # 2. 검색 파라미터 받기
     name_query = request.GET.get('name')
     category_query = request.GET.get('category')
     storage_query = request.GET.get('storage')
-
-    # 3. 필터링 적용
-    if name_query:
-        products = products.filter(name__icontains=name_query)
-    if category_query:
-        products = products.filter(category=category_query)
-    if storage_query:
-        products = products.filter(storage_type=storage_query)
-
-    # 4. 등록 팝업용 폼
+    if name_query: products = products.filter(name__icontains=name_query)
+    if category_query: products = products.filter(category=category_query)
+    if storage_query: products = products.filter(storage_type=storage_query)
     form = ProductForm()
-
-    # 5. 검색 필터에 사용할 옵션 데이터 (Enum choices)
-    # Product 모델에서 choices를 가져옵니다.
     from .models import ProductCategory, StorageType
-    
-    return render(request, 'fulfillment/product_list.html', {
-        'products': products, 
-        'form': form,
-        'categories': ProductCategory.choices, # 카테고리 목록
-        'storages': StorageType.choices,       # 보관타입 목록
-    })
+    return render(request, 'fulfillment/product_list.html', {'products': products, 'form': form, 'categories': ProductCategory.choices, 'storages': StorageType.choices})
 def product_create(request):
     if request.method == 'POST':
         form = ProductForm(request.POST)
@@ -556,23 +463,80 @@ def product_delete(request, pk):
     obj = get_object_or_404(Product, pk=pk)
     if request.method == 'POST': obj.delete(); return redirect('fulfillment:product_list')
     return render(request, 'fulfillment/common_delete.html', {'object': obj, 'back_url': 'fulfillment:product_list'})
-    
-def signup(request):
-    """회원가입"""
-    if request.method == 'POST':
-        form = SignUpForm(request.POST)
-        if form.is_valid():
-            user = form.save()
-            login(request, user) # 가입 후 즉시 로그인
-            return redirect('fulfillment:dashboard')
-    else:
-        form = SignUpForm()
-    return render(request, 'registration/signup.html', {'form': form})
 
-def delete_account(request):
-    """회원 탈퇴"""
+# --- 6. 자금/업무일지 ---
+def bank_list(request):
+    """법인 통장 목록 및 잔액 조회 (거래 등록 폼 추가)"""
+    accounts = BankAccount.objects.filter(is_active=True)
+    
+    # 1. 계좌 생성 폼
+    form = BankAccountForm()
+    
+    # 2. 거래 등록 폼 (팝업용)
+    transaction_form = BankTransactionForm(initial={'date': timezone.now().date()})
+    
+    return render(request, 'fulfillment/bank_list.html', {
+        'accounts': accounts, 
+        'form': form,
+        'transaction_form': transaction_form # ★ 템플릿으로 전달
+    })
+
+def bank_transaction_create(request):
+    """입출금 거래 저장"""
     if request.method == 'POST':
-        user = request.user
-        user.delete() # 계정 삭제
-        return redirect('login') # 로그인 화면으로 이동
-    return render(request, 'registration/delete_account.html')    
+        form = BankTransactionForm(request.POST)
+        if form.is_valid():
+            form.save()
+            return redirect('fulfillment:bank_list')
+    return redirect('fulfillment:bank_list')
+def bank_create(request):
+    if request.method == 'POST':
+        form = BankAccountForm(request.POST)
+        if form.is_valid(): form.save()
+    return redirect('fulfillment:bank_list')
+def bank_detail(request, pk):
+    account = get_object_or_404(BankAccount, pk=pk)
+    transactions = account.transactions.order_by('-date', '-id')
+    return render(request, 'fulfillment/bank_detail.html', {'account': account, 'transactions': transactions})
+
+def worklog_list(request):
+    logs = WorkLog.objects.select_related('employee').order_by('-date')
+    q_date = request.GET.get('date')
+    if q_date: logs = logs.filter(date=q_date)
+    form = WorkLogForm(initial={'date': timezone.now().date()})
+    return render(request, 'fulfillment/worklog_list.html', {'logs': logs, 'form': form})
+def worklog_create(request):
+    if request.method == 'POST':
+        form = WorkLogForm(request.POST)
+        if form.is_valid(): form.save()
+    return redirect('fulfillment:worklog_list')
+def worklog_update(request, pk):
+    obj = get_object_or_404(WorkLog, pk=pk)
+    if request.method == 'POST':
+        form = WorkLogForm(request.POST, instance=obj)
+        if form.is_valid(): form.save(); return redirect('fulfillment:worklog_list')
+    else: form = WorkLogForm(instance=obj)
+    return render(request, 'fulfillment/common_form.html', {'form': form, 'title': '업무일지 수정'})
+def worklog_delete(request, pk):
+    obj = get_object_or_404(WorkLog, pk=pk)
+    if request.method == 'POST': obj.delete(); return redirect('fulfillment:worklog_list')
+    return render(request, 'fulfillment/common_delete.html', {'object': obj, 'back_url': 'fulfillment:worklog_list'})
+
+# --- 7. 엑셀 다운로드 ---
+def export_inventory_excel(request):
+    queryset = Inventory.objects.filter(quantity__gt=0).select_related('product', 'location__zone').order_by('product__name')
+    # ... 검색 로직 ...
+    columns = [('상품명', 'product__name'), ('SKU', 'product__sku'), ('위치', 'location__code'), ('수량', 'quantity'), ('유통기한', 'expiry_date')]
+    return export_to_excel(queryset, 'Inventory_List', columns)
+
+def export_purchase_excel(request):
+    queryset = Purchase.objects.select_related('supplier').order_by('-purchase_date')
+    # ... 검색 로직 ...
+    columns = [('매입번호', 'id'), ('공급사', 'supplier__name'), ('매입일자', 'purchase_date'), ('총금액', 'total_amount'), ('상태', 'get_status_display')]
+    return export_to_excel(queryset, 'Purchase_List', columns)
+
+def export_order_excel(request):
+    queryset = Order.objects.select_related('client').order_by('-order_date')
+    # ... 검색 로직 ...
+    columns = [('주문번호', 'id'), ('납품처', 'client__name'), ('주문일시', 'order_date'), ('매출액', 'total_revenue'), ('상태', 'get_status_display')]
+    return export_to_excel(queryset, 'Order_List', columns)
