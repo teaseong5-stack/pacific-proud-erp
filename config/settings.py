@@ -93,3 +93,9 @@ STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 # 8. 기본 ID 필드 설정
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# 로그인 성공 시 이동할 URL (대시보드)
+LOGIN_REDIRECT_URL = '/'
+
+# 로그아웃 시 이동할 URL (로그인 화면)
+LOGOUT_REDIRECT_URL = '/accounts/login/'

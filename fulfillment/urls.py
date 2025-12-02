@@ -71,4 +71,7 @@ urlpatterns = [
     path('export/inventory/', views.export_inventory_excel, name='export_inventory'),
     path('export/purchase/', views.export_purchase_excel, name='export_purchase'),
     path('export/order/', views.export_order_excel, name='export_order'),
+    # 인증 관련 (가입/탈퇴)
+    path('signup/', views.signup, name='signup'),
+    path('delete_account/', views.delete_account, name='delete_account'),
    ]

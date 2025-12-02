@@ -6,6 +6,9 @@ from datetime import timedelta
 from django.http import HttpResponse
 from django.template.loader import render_to_string
 from decimal import Decimal
+# 회원가입용 Import
+from django.contrib.auth import login
+from .forms import SignUpForm
 
 # ★ 모델 전체 임포트
 from .models import (
@@ -553,3 +556,23 @@ def product_delete(request, pk):
     obj = get_object_or_404(Product, pk=pk)
     if request.method == 'POST': obj.delete(); return redirect('fulfillment:product_list')
     return render(request, 'fulfillment/common_delete.html', {'object': obj, 'back_url': 'fulfillment:product_list'})
+    
+def signup(request):
+    """회원가입"""
+    if request.method == 'POST':
+        form = SignUpForm(request.POST)
+        if form.is_valid():
+            user = form.save()
+            login(request, user) # 가입 후 즉시 로그인
+            return redirect('fulfillment:dashboard')
+    else:
+        form = SignUpForm()
+    return render(request, 'registration/signup.html', {'form': form})
+
+def delete_account(request):
+    """회원 탈퇴"""
+    if request.method == 'POST':
+        user = request.user
+        user.delete() # 계정 삭제
+        return redirect('login') # 로그인 화면으로 이동
+    return render(request, 'registration/delete_account.html')    

@@ -2,8 +2,9 @@ from django import forms
 from django.forms import inlineformset_factory  # ★ 이 줄이 꼭 있어야 합니다!
 from .models import (
     Inventory, Product, Location, Partner, Purchase, PurchaseItem, 
-    Order, OrderItem, Employee, Payroll, Expense, Payment, CompanyInfo
-)
+    Order, OrderItem, Employee, Payroll, Expense, Payment, CompanyInfo)
+from django.contrib.auth.forms import UserCreationForm
+from django.contrib.auth.models import User    
 
 # 1. 물류/재고 폼
 class InboundForm(forms.ModelForm):
@@ -185,3 +186,15 @@ OrderCreateFormSet = inlineformset_factory(
     Order, OrderItem, form=OrderItemForm,
     extra=5, can_delete=True
 )
+
+class SignUpForm(UserCreationForm):
+    """회원가입 폼 (Bootstrap 적용)"""
+    class Meta:
+        model = User
+        fields = ['username', 'email', 'first_name', 'last_name'] # ID, 이메일, 이름 입력
+        
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # 모든 필드에 부트스트랩 스타일 적용
+        for field in self.fields.values():
+            field.widget.attrs['class'] = 'form-control'
