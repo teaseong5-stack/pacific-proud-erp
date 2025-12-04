@@ -23,13 +23,17 @@ class PartnerType(models.TextChoices):
     BOTH = 'BOTH', '혼합'
 
 class ExpenseCategory(models.TextChoices):
+    """비용 계정과목 정의"""
+    # ★ 추가된 항목: 물품대금
+    PURCHASE = 'PURCHASE', '물품대금 (매입)' 
+    
     SALARY = 'SALARY', '급여/인건비'
     RENT = 'RENT', '임차료'
-    UTILITY = 'UTILITY', '수도광열비'
-    LOGISTICS = 'LOGISTICS', '운반비'
-    MEAL = 'MEAL', '복리후생비'
+    UTILITY = 'UTILITY', '수도광열비 (전기/수도)'
+    LOGISTICS = 'LOGISTICS', '운반비/물류비'
+    MEAL = 'MEAL', '복리후생비 (식대 등)'
     TAX = 'TAX', '세금과공과'
-    ETC = 'ETC', '기타'
+    ETC = 'ETC', '기타 잡비'
 
 # --- 2. 자금 관리 (통장) ★ 순서 상단 이동! ---
 class BankAccount(models.Model):
