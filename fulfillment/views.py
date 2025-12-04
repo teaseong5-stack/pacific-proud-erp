@@ -6,7 +6,7 @@ from datetime import timedelta
 from django.http import HttpResponse
 from django.template.loader import render_to_string
 from decimal import Decimal
-from django.contrib.auth import login # ★ 로그인 기능 추가
+from django.contrib.auth.decorators import login_required
 
 # 모델 전체 임포트
 from .models import (
@@ -44,6 +44,7 @@ def delete_account(request):
     return render(request, 'registration/delete_account.html')
 
 # --- 1. 대시보드 ---
+@login_required
 def dashboard(request):
     today = timezone.now().date()
     this_month_start = today.replace(day=1)
@@ -91,6 +92,7 @@ def dashboard(request):
     return render(request, 'fulfillment/dashboard.html', context)
 
 # --- 2. 물류 프로세스 ---
+@login_required
 def inbound_create(request):
     if request.method == 'POST':
         form = InboundForm(request.POST)
@@ -105,10 +107,12 @@ def inbound_create(request):
     products = Product.objects.all()
     return render(request, 'fulfillment/inbound_form.html', {'form': form, 'products': products})
 
+@login_required
 def print_label(request, inventory_id):
     inv = get_object_or_404(Inventory, id=inventory_id)
     return render(request, 'fulfillment/print_label.html', {'inventory': inv, 'barcode_img': generate_barcode_image(inv.batch_number)})
 
+@login_required
 def process_weight(request, order_id):
     order = get_object_or_404(Order, id=order_id)
     if request.method == 'POST':
@@ -128,6 +132,7 @@ def process_weight(request, order_id):
         return redirect('fulfillment:generate_invoice', order_id=order.id)
     return render(request, 'fulfillment/process_weight.html', {'order': order})
 
+@login_required
 def generate_invoice_pdf(request, order_id):
     order = get_object_or_404(Order, id=order_id)
     items = order.items.all()
@@ -148,6 +153,7 @@ def generate_invoice_pdf(request, order_id):
     return render(request, 'fulfillment/invoice_pdf.html', context)
 
 # --- 3. 회사 정보 설정 ---
+@login_required
 def company_update(request):
     company = CompanyInfo.objects.first()
     if not company: company = CompanyInfo.objects.create(name="우리회사(기본)")
@@ -159,6 +165,7 @@ def company_update(request):
     return render(request, 'fulfillment/common_form.html', {'form': form, 'title': '🏢 우리 회사 정보 설정'})
 
 # --- 4. 리포트 ---
+@login_required
 def monthly_report(request):
     query_month = request.GET.get('month')
     if query_month:
@@ -189,7 +196,7 @@ def monthly_report(request):
     return render(request, 'fulfillment/monthly_report.html', context)
 
 # --- 5. 조회 및 관리 리스트 (검색/엑셀 포함) ---
-
+@login_required
 def inventory_list(request):
     inventories = Inventory.objects.filter(quantity__gt=0).select_related('product', 'location__zone').order_by('product__name')
     p_name = request.GET.get('p_name')
@@ -216,6 +223,7 @@ def inventory_delete(request, pk):
     if request.method == 'POST': obj.delete(); return redirect('fulfillment:inventory_list')
     return render(request, 'fulfillment/common_delete.html', {'object': obj, 'back_url': 'fulfillment:inventory_list'})
 
+@login_required
 def purchase_list(request):
     purchases = Purchase.objects.select_related('supplier').order_by('-purchase_date')
     start_date = request.GET.get('start_date')
@@ -274,6 +282,7 @@ def purchase_delete(request, pk):
     if request.method == 'POST': obj.delete(); return redirect('fulfillment:purchase_list')
     return render(request, 'fulfillment/common_delete.html', {'object': obj, 'back_url': 'fulfillment:purchase_list'})
 
+@login_required
 def order_list(request):
     orders = Order.objects.select_related('client').order_by('-order_date')
     start_date = request.GET.get('start_date')
@@ -334,6 +343,7 @@ def order_delete(request, pk):
     if request.method == 'POST': obj.delete(); return redirect('fulfillment:order_list')
     return render(request, 'fulfillment/common_delete.html', {'object': obj, 'back_url': 'fulfillment:order_list'})
 
+@login_required
 def expense_list(request):
     expenses = Expense.objects.order_by('-date')
     form = ExpenseForm()
@@ -355,6 +365,7 @@ def expense_delete(request, pk):
     if request.method == 'POST': obj.delete(); return redirect('fulfillment:expense_list')
     return render(request, 'fulfillment/common_delete.html', {'object': obj, 'back_url': 'fulfillment:expense_list'})
 
+@login_required
 def employee_list(request):
     employees = Employee.objects.order_by('department', 'name')
     name_query = request.GET.get('name')
@@ -384,6 +395,7 @@ def employee_delete(request, pk):
     if request.method == 'POST': obj.delete(); return redirect('fulfillment:employee_list')
     return render(request, 'fulfillment/common_delete.html', {'object': obj, 'back_url': 'fulfillment:employee_list'})
 
+@login_required
 def payroll_list(request):
     payrolls = Payroll.objects.select_related('employee').order_by('-payment_date')
     start_date = request.GET.get('start_date')
@@ -411,6 +423,7 @@ def payroll_delete(request, pk):
     if request.method == 'POST': obj.delete(); return redirect('fulfillment:payroll_list')
     return render(request, 'fulfillment/common_delete.html', {'object': obj, 'back_url': 'fulfillment:payroll_list'})
 
+@login_required
 def partner_list(request):
     partners = Partner.objects.order_by('name')
     name_query = request.GET.get('name')
@@ -436,6 +449,7 @@ def partner_delete(request, pk):
     if request.method == 'POST': obj.delete(); return redirect('fulfillment:partner_list')
     return render(request, 'fulfillment/common_delete.html', {'object': obj, 'back_url': 'fulfillment:partner_list'})
 
+@login_required
 def product_list(request):
     products = Product.objects.order_by('category', 'name')
     name_query = request.GET.get('name')
@@ -465,6 +479,7 @@ def product_delete(request, pk):
     return render(request, 'fulfillment/common_delete.html', {'object': obj, 'back_url': 'fulfillment:product_list'})
 
 # --- 6. 자금/업무일지 ---
+@login_required
 def bank_list(request):
     """법인 통장 목록 및 잔액 조회 (거래 등록 폼 추가)"""
     accounts = BankAccount.objects.filter(is_active=True)
@@ -481,6 +496,7 @@ def bank_list(request):
         'transaction_form': transaction_form # ★ 템플릿으로 전달
     })
 
+@login_required
 def bank_transaction_create(request):
     """입출금 거래 저장"""
     if request.method == 'POST':
@@ -499,6 +515,7 @@ def bank_detail(request, pk):
     transactions = account.transactions.order_by('-date', '-id')
     return render(request, 'fulfillment/bank_detail.html', {'account': account, 'transactions': transactions})
 
+@login_required
 def worklog_list(request):
     logs = WorkLog.objects.select_related('employee').order_by('-date')
     q_date = request.GET.get('date')
@@ -523,6 +540,7 @@ def worklog_delete(request, pk):
     return render(request, 'fulfillment/common_delete.html', {'object': obj, 'back_url': 'fulfillment:worklog_list'})
 
 # --- 7. 엑셀 다운로드 ---
+@login_required
 def export_inventory_excel(request):
     queryset = Inventory.objects.filter(quantity__gt=0).select_related('product', 'location__zone').order_by('product__name')
     # ... 검색 로직 ...
@@ -541,8 +559,9 @@ def export_order_excel(request):
     columns = [('주문번호', 'id'), ('납품처', 'client__name'), ('주문일시', 'order_date'), ('매출액', 'total_revenue'), ('상태', 'get_status_display')]
     return export_to_excel(queryset, 'Order_List', columns)
     
+"""창고 및 위치 관리"""
+@login_required
 def location_list(request):
-    """창고 및 위치 관리"""
     zones = Zone.objects.prefetch_related('locations').order_by('name')
     zone_form = ZoneForm()
     location_form = LocationForm()
@@ -553,6 +572,7 @@ def location_list(request):
         'location_form': location_form
     })
 
+"""창고 및 위치 관리"""
 def zone_create(request):
     """구역 등록"""
     if request.method == 'POST':
@@ -560,6 +580,7 @@ def zone_create(request):
         if form.is_valid(): form.save()
     return redirect('fulfillment:location_list')
 
+"""창고 및 위치 관리"""
 def location_create(request):
     """위치 등록"""
     if request.method == 'POST':
@@ -567,12 +588,14 @@ def location_create(request):
         if form.is_valid(): form.save()
     return redirect('fulfillment:location_list')
 
+"""창고 및 위치 관리"""
 def zone_delete(request, pk):
     """구역 삭제"""
     obj = get_object_or_404(Zone, pk=pk)
     if request.method == 'POST': obj.delete(); return redirect('fulfillment:location_list')
     return render(request, 'fulfillment/common_delete.html', {'object': obj, 'back_url': 'fulfillment:location_list'})
 
+"""창고 및 위치 관리"""
 def location_delete(request, pk):
     """위치 삭제"""
     obj = get_object_or_404(Location, pk=pk)
