@@ -3,11 +3,10 @@ from django.forms import inlineformset_factory
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.models import User
 
-# ★ 모든 모델을 한 번에 다 가져와야 합니다!
 from .models import (
     Inventory, Product, Location, Partner, Purchase, PurchaseItem, 
     Order, OrderItem, Employee, Payroll, Expense, Payment, CompanyInfo,
-    BankAccount, BankTransaction, WorkLog
+    BankAccount, BankTransaction, WorkLog, Zone
 )
 
 # --- 회원가입 폼 ---
