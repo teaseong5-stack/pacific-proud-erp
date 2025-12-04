@@ -207,3 +207,24 @@ class OrderItemForm(forms.ModelForm):
             'quantity': forms.NumberInput(attrs={'class': 'form-control quantity-input', 'oninput': 'updateRow(this)'}),
         }
 OrderCreateFormSet = inlineformset_factory(Order, OrderItem, form=OrderItemForm, extra=5, can_delete=True)
+
+class ZoneForm(forms.ModelForm):
+    """창고 구역 등록 폼"""
+    class Meta:
+        model = Zone
+        fields = ['name', 'storage_type']
+        widgets = {
+            'name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '예: A구역 냉동고'}),
+            'storage_type': forms.Select(attrs={'class': 'form-select'}),
+        }
+
+class LocationForm(forms.ModelForm):
+    """세부 위치 등록 폼"""
+    class Meta:
+        model = Location
+        fields = ['zone', 'code', 'is_active']
+        widgets = {
+            'zone': forms.Select(attrs={'class': 'form-select'}),
+            'code': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '예: A-01-01'}),
+            'is_active': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+        }

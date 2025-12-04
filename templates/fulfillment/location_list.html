@@ -1,0 +1,62 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2>🏭 창고 구역 및 위치 관리</h2>
+    <div>
+        <button class="btn btn-outline-primary me-2" data-bs-toggle="modal" data-bs-target="#addZoneModal">
+            <i class="bi bi-folder-plus"></i> 구역(Zone) 추가
+        </button>
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addLocationModal">
+            <i class="bi bi-geo-alt"></i> 세부 위치 추가
+        </button>
+    </div>
+</div>
+
+<div class="row g-4">
+    {% for zone in zones %}
+    <div class="col-md-6 col-lg-4">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                <div>
+                    <strong>{{ zone.name }}</strong>
+                    <span class="badge bg-secondary ms-1">{{ zone.get_storage_type_display }}</span>
+                </div>
+                <a href="{% url 'fulfillment:zone_delete' zone.id %}" class="btn btn-sm text-danger"><i class="bi bi-trash"></i></a>
+            </div>
+            <div class="card-body p-0" style="max-height: 300px; overflow-y: auto;">
+                <ul class="list-group list-group-flush">
+                    {% for loc in zone.locations.all %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <span>
+                            <i class="bi bi-box-seam text-muted me-2"></i>
+                            {{ loc.code }}
+                        </span>
+                        <div class="d-flex align-items-center">
+                            {% if not loc.is_active %}
+                                <span class="badge bg-danger me-2">사용중지</span>
+                            {% endif %}
+                            <a href="{% url 'fulfillment:location_delete' loc.id %}" class="btn btn-sm text-muted py-0"><i class="bi bi-x-lg"></i></a>
+                        </div>
+                    </li>
+                    {% empty %}
+                    <li class="list-group-item text-center text-muted py-4">등록된 위치가 없습니다.</li>
+                    {% endfor %}
+                </ul>
+            </div>
+            <div class="card-footer text-muted small">
+                총 {{ zone.locations.count }}개 위치
+            </div>
+        </div>
+    </div>
+    {% empty %}
+    <div class="col-12 text-center p-5">
+        <h4 class="text-muted">등록된 창고 구역이 없습니다.</h4>
+        <p>우측 상단 '구역 추가' 버튼을 눌러 시작하세요.</p>
+    </div>
+    {% endfor %}
+</div>
+
+<div class="modal fade" id="addZoneModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header bg-light"><h5 class="modal-title">🏭 신규 구역(Zone) 등록</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><form method="post" action="{% url 'fulfillment:zone_create' %}">{% csrf_token %}<div class="modal-body"><div class="mb-3"><label class="form-label fw-bold">구역명</label>{{ zone_form.name }}</div><div class="mb-3"><label class="form-label fw-bold">보관 타입</label>{{ zone_form.storage_type }}</div></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">취소</button><button type="submit" class="btn btn-primary">등록</button></div></form></div></div></div>
+
+<div class="modal fade" id="addLocationModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header bg-primary text-white"><h5 class="modal-title">📍 세부 위치(Location) 등록</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div><form method="post" action="{% url 'fulfillment:location_create' %}">{% csrf_token %}<div class="modal-body"><div class="mb-3"><label class="form-label fw-bold">소속 구역</label>{{ location_form.zone }}</div><div class="mb-3"><label class="form-label fw-bold">위치 코드 (바코드)</label>{{ location_form.code }}<div class="form-text">예: A-01-01 (A구역 1번렉 1단)</div></div><div class="form-check mb-3">{{ location_form.is_active }}<label class="form-check-label">사용 가능</label></div></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">취소</button><button type="submit" class="btn btn-primary">등록</button></div></form></div></div></div>
+{% endblock %}

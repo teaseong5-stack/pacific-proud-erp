@@ -29,6 +29,7 @@ urlpatterns = [
     # 5. 등록 처리 (팝업 연결용) ★ 여기가 중요합니다!
     path('products/create/', views.product_create, name='product_create'),
     path('partners/create/', views.partner_create, name='partner_create'), # 이 줄이 없어서 에러가 났습니다.
+    
     # --- ★ 추가: 수정 및 삭제 URL ---
     # 1. 상품 (Product)
     path('products/update/<int:pk>/', views.product_update, name='product_update'),
@@ -49,6 +50,7 @@ urlpatterns = [
     # 주문 관리
     path('orders/update/<int:pk>/', views.order_update, name='order_update'),
     path('orders/delete/<int:pk>/', views.order_delete, name='order_delete'),
+    
     # 회사 정보
     path('settings/company/', views.company_update, name='company_update'),
     # 비용
@@ -87,4 +89,11 @@ urlpatterns = [
     path('worklog/create/', views.worklog_create, name='worklog_create'),
     path('worklog/update/<int:pk>/', views.worklog_update, name='worklog_update'),
     path('worklog/delete/<int:pk>/', views.worklog_delete, name='worklog_delete'),
+    
+    # 창고/위치 관리
+    path('locations/', views.location_list, name='location_list'),
+    path('locations/zone/create/', views.zone_create, name='zone_create'),
+    path('locations/zone/delete/<int:pk>/', views.zone_delete, name='zone_delete'),
+    path('locations/create/', views.location_create, name='location_create'),
+    path('locations/delete/<int:pk>/', views.location_delete, name='location_delete'),
    ]

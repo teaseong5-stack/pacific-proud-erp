@@ -20,7 +20,7 @@ from .forms import (
     InventoryForm, PurchaseForm, OrderForm,
     ExpenseForm, EmployeeForm, PayrollForm, CompanyInfoForm,
     BankAccountForm, WorkLogForm, SignUpForm,
-    PurchaseCreateFormSet, OrderCreateFormSet, BankTransactionForm
+    PurchaseCreateFormSet, OrderCreateFormSet, BankTransactionForm, ZoneForm, LocationForm
 )
 from .utils import generate_barcode_image, export_to_excel
 
@@ -540,3 +540,41 @@ def export_order_excel(request):
     # ... 검색 로직 ...
     columns = [('주문번호', 'id'), ('납품처', 'client__name'), ('주문일시', 'order_date'), ('매출액', 'total_revenue'), ('상태', 'get_status_display')]
     return export_to_excel(queryset, 'Order_List', columns)
+    
+def location_list(request):
+    """창고 및 위치 관리"""
+    zones = Zone.objects.prefetch_related('locations').order_by('name')
+    zone_form = ZoneForm()
+    location_form = LocationForm()
+    
+    return render(request, 'fulfillment/location_list.html', {
+        'zones': zones,
+        'zone_form': zone_form,
+        'location_form': location_form
+    })
+
+def zone_create(request):
+    """구역 등록"""
+    if request.method == 'POST':
+        form = ZoneForm(request.POST)
+        if form.is_valid(): form.save()
+    return redirect('fulfillment:location_list')
+
+def location_create(request):
+    """위치 등록"""
+    if request.method == 'POST':
+        form = LocationForm(request.POST)
+        if form.is_valid(): form.save()
+    return redirect('fulfillment:location_list')
+
+def zone_delete(request, pk):
+    """구역 삭제"""
+    obj = get_object_or_404(Zone, pk=pk)
+    if request.method == 'POST': obj.delete(); return redirect('fulfillment:location_list')
+    return render(request, 'fulfillment/common_delete.html', {'object': obj, 'back_url': 'fulfillment:location_list'})
+
+def location_delete(request, pk):
+    """위치 삭제"""
+    obj = get_object_or_404(Location, pk=pk)
+    if request.method == 'POST': obj.delete(); return redirect('fulfillment:location_list')
+    return render(request, 'fulfillment/common_delete.html', {'object': obj, 'back_url': 'fulfillment:location_list'}) 

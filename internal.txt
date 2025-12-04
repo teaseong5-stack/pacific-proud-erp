@@ -10,3 +10,5 @@ PGPASSWORD=v5ghdBjWkjWb7LKQgPEaE4xneEYMbMGN psql -h dpg-d4mmnanpm1nc73d29krg-a.s
 
 74.220.52.0/24
 74.220.60.0/24
+
+dnazit@2026*
