@@ -562,7 +562,14 @@ def export_order_excel(request):
 """창고 및 위치 관리"""
 @login_required
 def location_list(request):
-    zones = Zone.objects.prefetch_related('locations').order_by('name')
+    """창고 및 위치 관리 (구역별 재고 현황 팝업 기능 추가)"""
+    # prefetch_related를 사용해 '위치'와 그 위치에 있는 '재고', '상품' 정보를 미리 가져옵니다. (성능 최적화)
+    zones = Zone.objects.prefetch_related(
+        'locations', 
+        'locations__inventory_set', 
+        'locations__inventory_set__product'
+    ).order_by('name')
+    
     zone_form = ZoneForm()
     location_form = LocationForm()
     

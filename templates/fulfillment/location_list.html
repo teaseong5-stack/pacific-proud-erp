@@ -1,4 +1,6 @@
 {% extends 'base.html' %}
+{% load humanize %}
+
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-3">
     <h2>🏭 창고 구역 및 위치 관리</h2>
@@ -17,12 +19,19 @@
     <div class="col-md-6 col-lg-4">
         <div class="card shadow-sm h-100">
             <div class="card-header bg-light d-flex justify-content-between align-items-center">
-                <div>
-                    <strong>{{ zone.name }}</strong>
-                    <span class="badge bg-secondary ms-1">{{ zone.get_storage_type_display }}</span>
+                <div class="d-flex align-items-center">
+                    <a href="#" class="text-decoration-none fw-bold text-dark fs-5 me-2" 
+                       data-bs-toggle="modal" data-bs-target="#zoneInventoryModal{{ zone.id }}"
+                       title="클릭하여 재고 확인">
+                       {{ zone.name }} <i class="bi bi-search text-primary small" style="font-size: 0.7em;"></i>
+                    </a>
+                    <span class="badge bg-secondary">{{ zone.get_storage_type_display }}</span>
                 </div>
-                <a href="{% url 'fulfillment:zone_delete' zone.id %}" class="btn btn-sm text-danger"><i class="bi bi-trash"></i></a>
+                <a href="{% url 'fulfillment:zone_delete' zone.id %}" class="btn btn-sm text-danger" onclick="return confirm('구역을 삭제하시겠습니까? 하위 위치도 모두 삭제됩니다.');">
+                    <i class="bi bi-trash"></i>
+                </a>
             </div>
+            
             <div class="card-body p-0" style="max-height: 300px; overflow-y: auto;">
                 <ul class="list-group list-group-flush">
                     {% for loc in zone.locations.all %}
@@ -30,12 +39,15 @@
                         <span>
                             <i class="bi bi-box-seam text-muted me-2"></i>
                             {{ loc.code }}
+                            {% if loc.inventory_set.exists %}
+                                <span class="badge bg-info text-dark ms-1" style="font-size: 0.7em;">재고있음</span>
+                            {% endif %}
                         </span>
                         <div class="d-flex align-items-center">
                             {% if not loc.is_active %}
                                 <span class="badge bg-danger me-2">사용중지</span>
                             {% endif %}
-                            <a href="{% url 'fulfillment:location_delete' loc.id %}" class="btn btn-sm text-muted py-0"><i class="bi bi-x-lg"></i></a>
+                            <a href="{% url 'fulfillment:location_delete' loc.id %}" class="btn btn-sm text-muted py-0" onclick="return confirm('위치를 삭제하시겠습니까?');"><i class="bi bi-x-lg"></i></a>
                         </div>
                     </li>
                     {% empty %}
@@ -44,7 +56,58 @@
                 </ul>
             </div>
             <div class="card-footer text-muted small">
-                총 {{ zone.locations.count }}개 위치
+                총 {{ zone.locations.count }}개 위치 / 클릭하여 재고 조회
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="zoneInventoryModal{{ zone.id }}" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-info text-dark">
+                    <h5 class="modal-title fw-bold">📦 [{{ zone.name }}] 재고 현황</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-0">
+                    <table class="table table-striped mb-0 text-center align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th>위치 코드</th>
+                                <th>상품명</th>
+                                <th>SKU</th>
+                                <th>유통기한</th>
+                                <th class="text-end">수량</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for loc in zone.locations.all %}
+                                {% for inv in loc.inventory_set.all %}
+                                    {% if inv.quantity > 0 %}
+                                    <tr>
+                                        <td class="fw-bold text-primary">{{ loc.code }}</td>
+                                        <td class="text-start">{{ inv.product.name }}</td>
+                                        <td>{{ inv.product.sku }}</td>
+                                        <td {% if inv.is_expired %}class="text-danger fw-bold"{% endif %}>
+                                            {{ inv.expiry_date|date:"Y-m-d" }}
+                                        </td>
+                                        <td class="text-end fw-bold">{{ inv.quantity|intcomma }} {{ inv.product.unit }}</td>
+                                    </tr>
+                                    {% endif %}
+                                {% endfor %}
+                            {% endfor %}
+                            
+                            {% with has_inventory=False %}
+                                {% endwith %}
+                        </tbody>
+                    </table>
+                    
+                    <div class="p-3 text-center text-muted small bg-light border-top">
+                        * 수량이 0인 재고는 표시되지 않습니다.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">닫기</button>
+                </div>
             </div>
         </div>
     </div>
@@ -56,7 +119,36 @@
     {% endfor %}
 </div>
 
-<div class="modal fade" id="addZoneModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header bg-light"><h5 class="modal-title">🏭 신규 구역(Zone) 등록</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><form method="post" action="{% url 'fulfillment:zone_create' %}">{% csrf_token %}<div class="modal-body"><div class="mb-3"><label class="form-label fw-bold">구역명</label>{{ zone_form.name }}</div><div class="mb-3"><label class="form-label fw-bold">보관 타입</label>{{ zone_form.storage_type }}</div></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">취소</button><button type="submit" class="btn btn-primary">등록</button></div></form></div></div></div>
+<div class="modal fade" id="addZoneModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-light"><h5 class="modal-title">🏭 신규 구역(Zone) 등록</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <form method="post" action="{% url 'fulfillment:zone_create' %}">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="mb-3"><label class="form-label fw-bold">구역명</label>{{ zone_form.name }}</div>
+                    <div class="mb-3"><label class="form-label fw-bold">보관 타입</label>{{ zone_form.storage_type }}</div>
+                </div>
+                <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">취소</button><button type="submit" class="btn btn-primary">등록</button></div>
+            </form>
+        </div>
+    </div>
+</div>
 
-<div class="modal fade" id="addLocationModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header bg-primary text-white"><h5 class="modal-title">📍 세부 위치(Location) 등록</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div><form method="post" action="{% url 'fulfillment:location_create' %}">{% csrf_token %}<div class="modal-body"><div class="mb-3"><label class="form-label fw-bold">소속 구역</label>{{ location_form.zone }}</div><div class="mb-3"><label class="form-label fw-bold">위치 코드 (바코드)</label>{{ location_form.code }}<div class="form-text">예: A-01-01 (A구역 1번렉 1단)</div></div><div class="form-check mb-3">{{ location_form.is_active }}<label class="form-check-label">사용 가능</label></div></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">취소</button><button type="submit" class="btn btn-primary">등록</button></div></form></div></div></div>
+<div class="modal fade" id="addLocationModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white"><h5 class="modal-title">📍 세부 위치(Location) 등록</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
+            <form method="post" action="{% url 'fulfillment:location_create' %}">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="mb-3"><label class="form-label fw-bold">소속 구역</label>{{ location_form.zone }}</div>
+                    <div class="mb-3"><label class="form-label fw-bold">위치 코드</label>{{ location_form.code }}<div class="form-text">예: A-01-01</div></div>
+                    <div class="form-check mb-3">{{ location_form.is_active }}<label class="form-check-label">사용 가능</label></div>
+                </div>
+                <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">취소</button><button type="submit" class="btn btn-primary">등록</button></div>
+            </form>
+        </div>
+    </div>
+</div>
 {% endblock %}
