@@ -46,19 +46,26 @@ def delete_account(request):
 # --- 1. 대시보드 ---
 @login_required
 def dashboard(request):
+    """CEO 대시보드 (누적 매출 추가)"""
     today = timezone.now().date()
     this_month_start = today.replace(day=1)
 
+    # 1. [기존] 오늘 확정 매출
     today_revenue = OrderItem.objects.filter(
         order__order_date__date=today, order__status='SHIPPED'
     ).aggregate(s=Sum('final_amount'))['s'] or 0
 
+    # 2. [신규/강조] 이번 달 누적 매출 (주문 기준)
+    # SHIPPED(출고완료) 된 건만 집계합니다.
     month_orders = Order.objects.filter(order_date__date__gte=this_month_start, status='SHIPPED')
     month_revenue = month_orders.aggregate(s=Sum('total_revenue'))['s'] or 0
+    
+    # 3. 이번 달 영업이익 계산
     month_cogs = month_orders.aggregate(s=Sum('total_cogs'))['s'] or 0
     month_expenses = Expense.objects.filter(date__gte=this_month_start).aggregate(s=Sum('amount'))['s'] or 0
     month_profit = (month_revenue - month_cogs) - month_expenses
 
+    # 4. 자금 현황
     partners = Partner.objects.all()
     total_receivable = 0
     total_payable = 0
@@ -67,6 +74,7 @@ def dashboard(request):
         if balance > 0: total_receivable += balance
         elif balance < 0: total_payable += abs(balance)
 
+    # 5. 차트 데이터
     last_7_days = today - timedelta(days=6)
     daily_sales_qs = Order.objects.filter(
         order_date__date__gte=last_7_days, status='SHIPPED'
@@ -83,8 +91,11 @@ def dashboard(request):
     recent_orders = Order.objects.order_by('-order_date')[:5]
 
     context = {
-        'today_revenue': today_revenue, 'month_profit': month_profit,
-        'total_receivable': total_receivable, 'total_payable': total_payable,
+        'today_revenue': today_revenue, 
+        'month_revenue': month_revenue, # ★ 추가됨: 이번 달 누적 매출
+        'month_profit': month_profit,
+        'total_receivable': total_receivable, 
+        'total_payable': total_payable,
         'chart_dates': chart_dates, 'chart_revenues': chart_revenues,
         'expense_labels': expense_labels, 'expense_data': expense_data,
         'expiring': expiring, 'recent_orders': recent_orders,
