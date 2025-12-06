@@ -607,4 +607,40 @@ def location_delete(request, pk):
     """위치 삭제"""
     obj = get_object_or_404(Location, pk=pk)
     if request.method == 'POST': obj.delete(); return redirect('fulfillment:location_list')
-    return render(request, 'fulfillment/common_delete.html', {'object': obj, 'back_url': 'fulfillment:location_list'}) 
+    return render(request, 'fulfillment/common_delete.html', {'object': obj, 'back_url': 'fulfillment:location_list'})
+
+# fulfillment/views.py 맨 아래 추가
+
+from django.core.mail import EmailMessage
+from django.template.loader import render_to_string
+# PDF 생성 라이브러리 (설치되어 있어야 함, 없으면 생략하고 HTML 본문으로 보냄)
+# 여기서는 간단히 'HTML 이메일'을 보내는 방식으로 구현합니다.
+
+def email_invoice(request, order_id):
+    """거래명세서 이메일 발송"""
+    order = get_object_or_404(Order, id=order_id)
+    
+    if not order.client.email:
+        # 고객 이메일이 없으면 에러 메시지 (실제로는 알림창 띄우기)
+        return HttpResponse("고객(거래처) 정보에 이메일이 등록되지 않았습니다.")
+
+    # 이메일 본문 생성 (HTML)
+    html_content = render_to_string('fulfillment/invoice_email_content.html', {
+        'order': order,
+        'items': order.items.all()
+    })
+
+    # 이메일 객체 생성
+    email = EmailMessage(
+        subject=f"[PACIFIC PROUD] 거래명세서 (주문번호 #{order.id})",
+        body=html_content,
+        from_email='noreply@pacificproud.com', # 발신자 (설정 필요)
+        to=[order.client.email], # 수신자 (Partner 모델에 email 필드 필요)
+    )
+    email.content_subtype = "html" # HTML 형식
+
+    try:
+        email.send()
+        return HttpResponse("이메일이 성공적으로 발송되었습니다.")
+    except Exception as e:
+        return HttpResponse(f"발송 실패: {e}")    

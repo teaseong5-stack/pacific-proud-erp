@@ -78,6 +78,7 @@ class Partner(models.Model):
     contact_person = models.CharField(max_length=50, verbose_name="담당자명", blank=True, null=True)
     contact_phone = models.CharField(max_length=20, verbose_name="담당자 연락처", blank=True, null=True)
     initial_balance = models.DecimalField(max_digits=12, decimal_places=0, default=0, verbose_name="기초 미수/미지급금")
+    email = models.EmailField(verbose_name="이메일", blank=True, null=True)
 
     def __str__(self):
         return f"[{self.get_partner_type_display()}] {self.name}"

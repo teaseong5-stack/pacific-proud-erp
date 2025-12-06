@@ -186,19 +186,51 @@
 </div>
 
 <script>
-    // 팝업 안에서 상품 선택 시 금액 자동 계산
-    function updatePurRow(element) {
-        const row = element.closest('tr');
-        const select = row.querySelector('.product-select');
-        const quantity = row.querySelector('.quantity-input').value || 0;
-        const totalDisplay = row.querySelector('.total-display');
-        
-        let price = 0;
-        if (select.selectedIndex > 0) {
-            price = select.selectedOptions[0].dataset.price || 0;
-        }
-        
-        totalDisplay.value = Number(price * quantity).toLocaleString() + ' đ';
-    }
+    $(document).ready(function() {
+        // 모달이 열릴 때 Select2 활성화
+        $('#addPurchaseModal').on('shown.bs.modal', function () {
+            $('.product-select').select2({
+                theme: 'bootstrap-5',
+                dropdownParent: $('#addPurchaseModal'), // ★ 핵심 설정
+                placeholder: '자재 검색',
+                width: '100%'
+            });
+            
+            // 공급사 선택창도 검색 가능하게
+            $('select[name="supplier"]').select2({
+                theme: 'bootstrap-5',
+                dropdownParent: $('#addPurchaseModal'),
+                width: '100%'
+            });
+        });
+
+        // 상품 선택 시 이벤트
+        $(document).on('select2:select', '.product-select', function(e) {
+            const select = this;
+            const row = select.closest('tr');
+            const quantityInput = row.querySelector('.quantity-input');
+            const totalDisplay = row.querySelector('.total-display');
+
+            const selectedOption = select.options[select.selectedIndex];
+            const price = selectedOption.dataset.price || 0;
+            const quantity = quantityInput.value || 0;
+            
+            totalDisplay.value = Number(price * quantity).toLocaleString() + ' đ';
+        });
+
+        // 수량 변경 시 이벤트
+        $(document).on('input', '.quantity-input', function() {
+            const row = this.closest('tr');
+            const select = row.querySelector('.product-select');
+            const totalDisplay = row.querySelector('.total-display');
+            
+            // 상품이 선택 안 되어있으면 가격 0
+            let price = 0;
+            if (select.selectedIndex >= 0) {
+                 price = select.options[select.selectedIndex].dataset.price || 0;
+            }
+            const quantity = this.value || 0;
+            totalDisplay.value = Number(price * quantity).toLocaleString() + ' đ';
+        });
+    });
 </script>
-{% endblock %}

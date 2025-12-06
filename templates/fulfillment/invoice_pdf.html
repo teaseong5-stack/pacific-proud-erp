@@ -77,9 +77,18 @@
     {% load humanize %}
 
     <div class="action-buttons">
-        <button onclick="window.print()" class="btn btn-print">🖨️ 인쇄 (Print)</button>
-        <a href="{% url 'fulfillment:order_list' %}" class="btn btn-back">⬅ 목록 (Back)</a>
-    </div>
+    <button onclick="window.print()" class="btn btn-print">🖨️ 인쇄 (Print)</button>
+    
+    <a href="#" onclick="alert('이메일 발송 기능을 준비 중입니다. (SMTP 설정 필요)')" class="btn" style="background-color: #ffc107; color: black;">
+        📧 이메일 발송
+    </a>
+
+    <button onclick="shareInvoice()" class="btn" style="background-color: #25d366;">
+        📱 카톡/Zalo 공유
+    </button>
+
+    <a href="{% url 'fulfillment:order_list' %}" class="btn btn-back">⬅ 목록 (Back)</a>
+</div>
 
     <div class="page">
         <div class="header-title">거 래 명 세 서</div>
@@ -146,12 +155,23 @@
                 <strong>※ 입금 계좌 안내</strong><br>
                 {{ company.bank_account|default:"-" }}
             </div>
-            <div class="total-amount">
-                <span class="total-label" style="font-size: 16px; font-weight: bold;">총 합계금액 :</span>
-                <span class="total-value">{{ order.total_revenue|intcomma }} đ</span>
+            
+            <div class="total-amount" style="text-align: right; line-height: 1.8;">
+                <div>
+                    <span style="font-size: 14px; color: #555;">금번 청구액 :</span>
+                    <span style="font-size: 16px; font-weight: bold; width: 120px; display: inline-block;">{{ order.total_revenue|intcomma }} đ</span>
+                </div>
+                <div>
+                    <span style="font-size: 14px; color: #555;">전 미수금 :</span>
+                    <span style="font-size: 16px; font-weight: bold; width: 120px; display: inline-block;">{{ previous_balance|intcomma }} đ</span>
+                </div>
+                <div style="margin-top: 5px; border-top: 1px solid #aaa; padding-top: 5px;">
+                    <span style="font-size: 16px; font-weight: bold; color: #333;">총 미수금 :</span>
+                    <span style="font-size: 24px; font-weight: bold; color: #d63031; width: 120px; display: inline-block;">{{ total_balance|intcomma }} đ</span>
+                </div>
             </div>
         </div>
-        <div style="margin-top: 50px; text-align: center; font-size: 14px;">위와 같이 정히 청구(영수)합니다.</div>
+        <div style="margin-top: 30px; text-align: center; font-size: 14px;">위와 같이 정히 청구(영수)합니다.</div>
     </div>
 
     <div class="page">
@@ -242,3 +262,24 @@
     </div>
 </body>
 </html>
+
+<script>
+    function shareInvoice() {
+        const url = window.location.href; // 현재 명세서 주소
+        const title = "거래명세서 - PACIFIC PROUD";
+        
+        // 모바일 브라우저의 기본 공유 기능 호출 (카톡, Zalo, 문자 등 선택 가능)
+        if (navigator.share) {
+            navigator.share({
+                title: title,
+                text: '요청하신 거래명세서입니다.',
+                url: url
+            }).catch(console.error);
+        } else {
+            // PC에서는 링크 복사
+            navigator.clipboard.writeText(url).then(() => {
+                alert("명세서 주소가 복사되었습니다.\nZalo나 카톡 채팅방에 붙여넣기(Ctrl+V) 하세요.");
+            });
+        }
+    }
+</script>
