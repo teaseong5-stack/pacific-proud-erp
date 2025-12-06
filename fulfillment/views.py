@@ -7,6 +7,8 @@ from django.http import HttpResponse
 from django.template.loader import render_to_string
 from decimal import Decimal
 from django.contrib.auth.decorators import login_required
+from .services import create_picking_list
+from django.contrib import messages
 
 # 모델 전체 임포트
 from .models import (
@@ -363,6 +365,24 @@ def order_create(request):
             return redirect('fulfillment:order_list')
 
     return redirect('fulfillment:order_list')
+    
+def order_allocate(request, pk):
+    """주문 리스트에서 바로 피킹 지시 실행"""
+    order = get_object_or_404(Order, pk=pk)
+    try:
+        # services.py에 있는 함수 호출
+        # (상단에 from .services import create_picking_list 가 있어야 함)
+        from .services import create_picking_list 
+        create_picking_list(order)
+        # messages 프레임워크 사용 (상단에 from django.contrib import messages 필요)
+        from django.contrib import messages
+        messages.success(request, f"주문 #{order.id} - 재고 할당 및 차감 완료!")
+    except Exception as e:
+        from django.contrib import messages
+        messages.error(request, f"할당 실패: {e}")
+        
+    return redirect('fulfillment:order_list')
+    
 def order_update(request, pk):
     order = get_object_or_404(Order, pk=pk)
     if request.method == 'POST':
