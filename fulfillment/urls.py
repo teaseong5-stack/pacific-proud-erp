@@ -50,6 +50,7 @@ urlpatterns = [
     # 주문 관리
     path('orders/update/<int:pk>/', views.order_update, name='order_update'),
     path('orders/delete/<int:pk>/', views.order_delete, name='order_delete'),
+    path('orders/allocate/<int:pk>/', views.order_allocate, name='order_allocate'),
     
     # 회사 정보
     path('settings/company/', views.company_update, name='company_update'),

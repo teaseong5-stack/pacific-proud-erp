@@ -71,8 +71,13 @@ def dashboard(request):
     total_payable = 0
     for p in partners:
         balance = p.current_balance
-        if balance > 0: total_receivable += balance
-        elif balance < 0: total_payable += abs(balance)
+        
+        if balance > 0: 
+            # 양수면 받을 돈 (미수금)
+            total_receivable += balance
+        elif balance < 0: 
+            # 음수면 줄 돈 (미지급금) -> 절대값(abs)으로 변환해서 더함
+            total_payable += abs(balance)
 
     # 5. 차트 데이터
     last_7_days = today - timedelta(days=6)
@@ -326,21 +331,37 @@ def order_list(request):
         'orders': orders, 'form': form, 'products_all': products_all, 'clients': clients
     })
 def order_create(request):
+    """신규 주문 등록 (단순 접수 - 재고 차감 안 함)"""
     if request.method == 'POST':
         form = OrderForm(request.POST)
         formset = OrderCreateFormSet(request.POST)
+        
         if form.is_valid() and formset.is_valid():
-            order = form.save()
+            # 1. 주문 헤더 저장 (상태는 기본적으로 PENDING)
+            order = form.save(commit=False)
+            order.status = 'PENDING' # 강제로 접수 상태로 고정
+            order.save()
+            
+            # 2. 주문 품목 저장
             items = formset.save(commit=False)
             total_rev = 0
+            
             for item in items:
                 item.order = order
+                # 판매단가 및 금액 확정
                 item.final_amount = item.quantity * item.product.price
                 total_rev += item.final_amount
                 item.save()
+                
+                # ★ 중요: 여기서는 Inventory(재고)를 건드리지 않습니다!
+                # 재고 차감은 나중에 '피킹 지시' 단계에서 수행합니다.
+            
+            # 3. 총 매출액 업데이트
             order.total_revenue = total_rev
             order.save()
+            
             return redirect('fulfillment:order_list')
+
     return redirect('fulfillment:order_list')
 def order_update(request, pk):
     order = get_object_or_404(Order, pk=pk)

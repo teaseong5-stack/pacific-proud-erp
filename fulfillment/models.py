@@ -85,14 +85,34 @@ class Partner(models.Model):
 
     @property
     def current_balance(self):
+        """
+        현재 잔액 계산 (실시간)
+        - CLIENT(매출처): (기초 + 매출총액) - 입금총액 = 받을 돈 (양수)
+        - SUPPLIER(매입처): (기초 + 매입총액) - 출금총액 = 줄 돈 (양수 -> 음수로 표현하여 부채임을 표시)
+        """
+        # 1. 입출금 내역 집계
+        deposit_total = self.payment_set.filter(payment_type='INBOUND').aggregate(s=Sum('amount'))['s'] or 0
+        withdrawal_total = self.payment_set.filter(payment_type='OUTBOUND').aggregate(s=Sum('amount'))['s'] or 0
+        
         if self.partner_type == 'CLIENT':
-            total_trade = self.order_set.filter(status='SHIPPED').aggregate(s=Sum('total_revenue'))['s'] or 0
-            total_paid = self.payment_set.aggregate(s=Sum('amount'))['s'] or 0
-            return (self.initial_balance + total_trade) - total_paid
+            # 매출 총액 (출고완료 기준)
+            sales_total = self.order_set.filter(status='SHIPPED').aggregate(s=Sum('total_revenue'))['s'] or 0
+            # (기초 + 매출) - (받은돈 - 거스름돈?) -> 보통 수금만 있음
+            return (self.initial_balance + sales_total) - deposit_total
+            
         elif self.partner_type == 'SUPPLIER':
-            total_trade = self.purchase_set.filter(status='RECEIVED').aggregate(s=Sum('total_amount'))['s'] or 0
-            total_paid = self.payment_set.aggregate(s=Sum('amount'))['s'] or 0
-            return (self.initial_balance + total_trade) - total_paid
+            # 매입 총액 (입고완료 기준) -> ★ 여기서 매입대금이 집계됩니다.
+            purchase_total = self.purchase_set.filter(status='RECEIVED').aggregate(s=Sum('total_amount'))['s'] or 0
+            
+            # 줄 돈(매입액)에서 준 돈(출금)을 뺌. 
+            # 결과가 양수면 '줄 돈이 남았다(미지급금)'는 뜻.
+            # ERP 상에서는 미지급금을 '음수(-)'로 표현하여 자산과 구분하기도 함.
+            # 여기서는 [줄 돈 - 준 돈] 으로 계산하여, 양수면 빚이 있는 것.
+            payable = (self.initial_balance + purchase_total) - withdrawal_total
+            
+            # 대시보드 합산을 위해 '미지급금'은 음수로 반환하는 것이 계산상 편함 (자산 감소)
+            return payable * -1 
+
         return 0
 
 class Zone(models.Model):
@@ -127,6 +147,14 @@ class Purchase(models.Model):
     status = models.CharField(max_length=20, default='ORDERED', choices=[('ORDERED','발주됨'), ('RECEIVED','입고완료')])
     is_bill_published = models.BooleanField(default=False)
     def __str__(self): return f"매입 #{self.id}"
+    # ★ 추가된 메서드: 총금액 업데이트
+    def update_total_amount(self):
+        # 연결된 모든 아이템의 (수량*단가) 합계
+        total = self.items.aggregate(
+            total=Sum(models.F('quantity') * models.F('unit_cost'), output_field=models.DecimalField())
+        )['total'] or 0
+        self.total_amount = total
+        self.save()
 
 class PurchaseItem(models.Model):
     purchase = models.ForeignKey(Purchase, on_delete=models.CASCADE, related_name='items')
@@ -136,8 +164,20 @@ class PurchaseItem(models.Model):
     target_location = models.ForeignKey(Location, on_delete=models.PROTECT)
     expiry_date = models.DateField()
     def save(self, *args, **kwargs):
-        if not self.unit_cost: self.unit_cost = self.product.purchase_price
+        # 1. 단가 자동 설정
+        if not self.unit_cost:
+            self.unit_cost = self.product.purchase_price
+        
         super().save(*args, **kwargs)
+        
+        # 2. ★ 저장 후 부모(Purchase)의 총금액 재계산 (트리거)
+        self.purchase.update_total_amount()
+
+    def delete(self, *args, **kwargs):
+        # 3. 삭제 시에도 총금액 재계산
+        purchase = self.purchase
+        super().delete(*args, **kwargs)
+        purchase.update_total_amount()
 
 class Inventory(models.Model):
     product = models.ForeignKey(Product, on_delete=models.PROTECT)

@@ -99,12 +99,15 @@ class OrderAdmin(admin.ModelAdmin):
         success_count = 0
         for order in queryset:
             try:
+                # 여기서 services.py 의 함수를 호출함 -> 재고 차감 발생
                 create_picking_list(order)
                 success_count += 1
             except Exception as e:
                 self.message_user(request, f"주문 #{order.id} 오류: {e}", level=messages.ERROR)
+        
         if success_count > 0:
-            self.message_user(request, f"{success_count}건 재고 할당 완료.")
+            self.message_user(request, f"{success_count}건에 대해 재고 할당 및 차감을 완료했습니다.")
+    
     action_allocate_stock.short_description = "재고 할당 및 피킹지시(FEFO)"
 
 @admin.register(Expense)

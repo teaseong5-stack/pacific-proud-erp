@@ -99,3 +99,12 @@ LOGIN_REDIRECT_URL = '/'
 
 # 로그아웃 시 이동할 URL (로그인 화면)
 LOGOUT_REDIRECT_URL = '/accounts/login/'
+
+# 이메일 설정 (Gmail)
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = 'pacificproud.dn@gmail.com'
+EMAIL_HOST_PASSWORD = ' thaibinhduong123*$' # 띄어쓰기 없이 입력
+DEFAULT_FROM_EMAIL = EMAIL_HOST_USER

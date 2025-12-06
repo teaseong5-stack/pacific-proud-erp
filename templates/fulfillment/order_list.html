@@ -87,9 +87,18 @@
                         {% else %} <span class="badge bg-warning text-dark">접수대기</span> {% endif %}
                     </td>
                     <td class="text-center" style="white-space: nowrap;">
+                        {% if order.status == 'PENDING' %}
+                        <a href="{% url 'fulfillment:order_allocate' order.id %}" class="btn btn-sm btn-warning me-1" title="피킹지시(재고차감)" onclick="return confirm('재고를 차감하고 피킹 지시를 내리시겠습니까?');">
+                            <i class="bi bi-lightning-charge-fill"></i>
+                        </a>
+                        {% endif %}
+
+                        {% if order.status != 'PENDING' %}
                         <a href="{% url 'fulfillment:process_weight' order.id %}" class="btn btn-sm btn-outline-success me-1" title="중량/검수">
                             <i class="bi bi-ui-checks"></i>
                         </a>
+                        {% endif %}
+
                         <a href="{% url 'fulfillment:generate_invoice' order.id %}" class="btn btn-sm btn-outline-secondary me-1" target="_blank" title="명세서">
                             <i class="bi bi-receipt"></i>
                         </a>
