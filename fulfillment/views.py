@@ -115,21 +115,36 @@ def print_label(request, inventory_id):
 @login_required
 def process_weight(request, order_id):
     order = get_object_or_404(Order, id=order_id)
+    
     if request.method == 'POST':
+        # 1. 피킹 리스트에 실측 무게만 업데이트 (재고 차감 X)
         for picking in order.picking_lists.all():
             w = request.POST.get(f'weight_{picking.id}')
-            if w: picking.picked_weight = float(w); picking.picked = True; picking.save()
+            if w: 
+                picking.picked_weight = float(w)
+                picking.picked = True
+                picking.save()
+            
+            # ★ 주의: 여기서는 inventory.quantity를 건드리지 않습니다!
+            # (이미 create_picking_list에서 차감되었기 때문)
         
+        # 2. 주문 아이템 금액 확정 (실측 중량 기준)
         for item in order.items.all():
             related_pickings = order.picking_lists.filter(inventory__product=item.product)
             total_w = sum(p.picked_weight or 0 for p in related_pickings)
-            if total_w > 0: item.supplied_weight = total_w; item.save()
             
+            if total_w > 0: 
+                item.supplied_weight = total_w
+                item.save()
+            
+        # 3. 주문 상태 변경 (ALLOCATED -> SHIPPED)
         order.status = 'SHIPPED'
         order.total_revenue = sum(item.final_amount or 0 for item in order.items.all())
-        order.total_cogs = order.total_revenue * Decimal('0.7')
+        order.total_cogs = order.total_revenue * Decimal('0.7') 
         order.save()
+        
         return redirect('fulfillment:generate_invoice', order_id=order.id)
+        
     return render(request, 'fulfillment/process_weight.html', {'order': order})
 
 @login_required
