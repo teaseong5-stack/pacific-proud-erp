@@ -16,7 +16,7 @@ from operator import attrgetter
 from .models import (
     Partner, Product, Purchase, Inventory, Order, OrderItem, 
     PickingList, Expense, Employee, Payroll, Payment, Zone, Location,
-    CompanyInfo, BankAccount, BankTransaction, WorkLog, PaymentQuickForm
+    CompanyInfo, BankAccount, BankTransaction, WorkLog
 )
 # 폼 전체 임포트 (SignUpForm 추가됨)
 from .forms import (
@@ -24,7 +24,7 @@ from .forms import (
     InventoryForm, PurchaseForm, OrderForm,
     ExpenseForm, EmployeeForm, PayrollForm, CompanyInfoForm,
     BankAccountForm, WorkLogForm, SignUpForm,
-    PurchaseCreateFormSet, OrderCreateFormSet, BankTransactionForm, ZoneForm, LocationForm
+    PurchaseCreateFormSet, OrderCreateFormSet, BankTransactionForm, ZoneForm, LocationForm, PaymentQuickForm
 )
 from .utils import generate_barcode_image, export_to_excel
 
@@ -789,3 +789,38 @@ def partner_detail(request, pk):
         'ledger_data': ledger_data,
         'form': form, # 팝업 폼 전달
     })
+    
+def partner_payment_create(request, pk):
+    """거래처 상세 화면에서 입출금 바로 등록"""
+    partner = get_object_or_404(Partner, pk=pk)
+    if request.method == 'POST':
+        form = PaymentQuickForm(request.POST)
+        if form.is_valid():
+            payment = form.save(commit=False)
+            payment.partner = partner # 거래처 연결
+            payment.save()
+    return redirect('fulfillment:partner_detail', pk=pk)
+
+def payment_update(request, pk):
+    """입출금 수정"""
+    payment = get_object_or_404(Payment, pk=pk)
+    if request.method == 'POST':
+        form = BankTransactionForm(request.POST, instance=payment) # 기존 폼 재사용 가능
+        if form.is_valid():
+            form.save()
+            # 수정 후 해당 거래처 원장으로 복귀
+            return redirect('fulfillment:partner_detail', pk=payment.partner.id)
+    else:
+        # BankTransactionForm은 필드가 많으니 PaymentQuickForm 사용해도 됨
+        form = PaymentQuickForm(instance=payment) 
+    return render(request, 'fulfillment/common_form.html', {'form': form, 'title': '입출금 내역 수정'})
+
+def payment_delete(request, pk):
+    """입출금 삭제"""
+    payment = get_object_or_404(Payment, pk=pk)
+    partner_id = payment.partner.id
+    if request.method == 'POST':
+        payment.delete()
+        return redirect('fulfillment:partner_detail', pk=partner_id)
+    return render(request, 'fulfillment/common_delete.html', {'object': payment, 'back_url': 'fulfillment:partner_list'}) 
+    # back_url은 템플릿에서 동적으로 처리하거나, 간단히 파트너 리스트로 보냄    
