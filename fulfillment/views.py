@@ -9,6 +9,8 @@ from decimal import Decimal
 from django.contrib.auth.decorators import login_required
 from .services import create_picking_list
 from django.contrib import messages
+from itertools import chain
+from operator import attrgetter
 
 # 모델 전체 임포트
 from .models import (
@@ -710,4 +712,66 @@ def email_invoice(request, order_id):
         email.send()
         return HttpResponse("이메일이 성공적으로 발송되었습니다.")
     except Exception as e:
-        return HttpResponse(f"발송 실패: {e}")    
+        return HttpResponse(f"발송 실패: {e}")
+
+def partner_detail(request, pk):
+    """거래처 상세 원장 (매입/매출/수금/지급 통합 조회)"""
+    partner = get_object_or_404(Partner, pk=pk)
+    
+    # 1. 거래 내역 가져오기 (매출 또는 매입)
+    transactions = []
+    
+    if partner.partner_type in ['CLIENT', 'BOTH']:
+        # 매출(Order) 내역 - 출고완료된 것만
+        orders = partner.order_set.filter(status='SHIPPED')
+        for o in orders:
+            o.type_label = "매출 (주문)"
+            o.amount = o.total_revenue # 매출액은 (+) 잔액 증가
+            o.date = o.order_date.date()
+            transactions.append(o)
+            
+    if partner.partner_type in ['SUPPLIER', 'BOTH']:
+        # 매입(Purchase) 내역 - 입고완료된 것만
+        purchases = partner.purchase_set.filter(status='RECEIVED')
+        for p in purchases:
+            p.type_label = "매입 (발주)"
+            p.amount = p.total_amount # 매입액은 (+) 잔액(줄 돈) 증가
+            p.date = p.purchase_date
+            transactions.append(p)
+
+    # 2. 입출금(Payment) 내역 가져오기
+    payments = partner.payment_set.all()
+    for pay in payments:
+        pay.type_label = pay.get_payment_type_display() # 수금/지급
+        # 돈을 줬거나 받으면 잔액 감소 (-)
+        # 매출처 수금 -> 받을 돈 감소
+        # 매입처 지급 -> 줄 돈 감소
+        pay.amount = -pay.amount 
+        # (단, 날짜 필드명이 모델마다 다르면 통일 필요. Payment는 date 필드 사용)
+        
+        transactions.append(pay)
+
+    # 3. 날짜순 정렬
+    # (x.date가 객체마다 있으므로 이를 기준으로 정렬)
+    transactions.sort(key=lambda x: x.date)
+
+    # 4. 누적 잔액 계산 (Running Balance)
+    running_balance = partner.initial_balance
+    
+    # 기초 잔액을 리스트 맨 앞에 가상의 데이터로 넣어줌 (선택사항)
+    ledger_data = []
+    
+    for t in transactions:
+        running_balance += t.amount
+        ledger_data.append({
+            'date': t.date,
+            'type': t.type_label,
+            'desc': str(t), # __str__ 메서드 활용
+            'change': t.amount, # 발생액
+            'balance': running_balance # 누적 잔액
+        })
+
+    return render(request, 'fulfillment/partner_detail.html', {
+        'partner': partner,
+        'ledger_data': ledger_data, # 가공된 원장 데이터
+    })        

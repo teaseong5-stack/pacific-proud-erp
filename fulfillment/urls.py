@@ -38,6 +38,7 @@ urlpatterns = [
     # 2. 거래처 (Partner)
     path('partners/update/<int:pk>/', views.partner_update, name='partner_update'),
     path('partners/delete/<int:pk>/', views.partner_delete, name='partner_delete'),
+    path('partners/<int:pk>/', views.partner_detail, name='partner_detail'),
     
     # 재고 관리
     path('inventory/update/<int:pk>/', views.inventory_update, name='inventory_update'),

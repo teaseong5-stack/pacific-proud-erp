@@ -64,7 +64,11 @@
                         {% else %}<span class="badge bg-info text-dark">혼합</span>{% endif %}
                     </td>
                     
-                    <td class="fw-bold">{{ p.name }}</td>
+                    <td class="fw-bold">
+                        <a href="{% url 'fulfillment:partner_detail' p.id %}" class="text-decoration-none text-dark">
+                        {{ p.name }} <i class="bi bi-box-arrow-in-up-right small text-muted ms-1"></i>
+                        </a>
+                    </td> 
                     
                     <td>
                         {{ p.owner_name|default:"-" }}

@@ -1,0 +1,102 @@
+{% extends 'base.html' %}
+{% load humanize %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2>🏢 거래처 원장 (Partner Ledger)</h2>
+        <span class="text-muted fs-5">{{ partner.name }}</span>
+        <span class="badge {% if partner.partner_type == 'CLIENT' %}bg-primary{% else %}bg-secondary{% endif %} ms-2">
+            {{ partner.get_partner_type_display }}
+        </span>
+    </div>
+    <a href="{% url 'fulfillment:partner_list' %}" class="btn btn-secondary">
+        <i class="bi bi-arrow-left"></i> 목록으로
+    </a>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-4">
+        <div class="card shadow-sm h-100">
+            <div class="card-body">
+                <h6 class="text-muted mb-2">기초 이월 잔액</h6>
+                <h3 class="fw-bold">{{ partner.initial_balance|intcomma }} đ</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card shadow-sm h-100 border-primary">
+            <div class="card-body">
+                <h6 class="text-primary mb-2">현재 최종 잔액</h6>
+                <h3 class="fw-bold text-primary">{{ partner.current_balance|intcomma }} đ</h3>
+                <small class="text-muted">
+                    {% if partner.current_balance > 0 %} (받을 돈 / 줄 돈 남음)
+                    {% elif partner.current_balance < 0 %} (초과 수금 / 선급금)
+                    {% else %} (정산 완료) {% endif %}
+                </small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card shadow-sm h-100">
+            <div class="card-body">
+                <h6 class="text-muted mb-2">담당자 정보</h6>
+                <p class="mb-1"><strong>{{ partner.contact_person|default:"-" }}</strong></p>
+                <p class="mb-0">{{ partner.contact_phone|default:"-" }}</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-header bg-light fw-bold">
+        <i class="bi bi-list-ul me-2"></i> 상세 거래 내역
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>날짜</th>
+                    <th>구분</th>
+                    <th>내용 (주문/매입번호 등)</th>
+                    <th class="text-end text-primary">증가(+)</th>
+                    <th class="text-end text-danger">감소(-)</th>
+                    <th class="text-end table-active">잔액</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr class="bg-light bg-opacity-50">
+                    <td>-</td>
+                    <td><span class="badge bg-secondary">이월</span></td>
+                    <td>기초 잔액</td>
+                    <td></td>
+                    <td></td>
+                    <td class="text-end fw-bold">{{ partner.initial_balance|intcomma }} đ</td>
+                </tr>
+
+                {% for row in ledger_data %}
+                <tr>
+                    <td>{{ row.date|date:"Y-m-d" }}</td>
+                    <td>
+                        {% if '매출' in row.type or '매입' in row.type %}
+                            <span class="badge bg-info text-dark">{{ row.type }}</span>
+                        {% else %}
+                            <span class="badge bg-success">{{ row.type }}</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ row.desc }}</td>
+                    
+                    <td class="text-end text-primary">
+                        {% if row.change > 0 %}{{ row.change|intcomma }}{% endif %}
+                    </td>
+                    <td class="text-end text-danger">
+                        {% if row.change < 0 %}{{ row.change|stringformat:"d"|slice:"1:"|intcomma }}{% endif %} </td>
+                    
+                    <td class="text-end fw-bold table-active">{{ row.balance|intcomma }} đ</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
