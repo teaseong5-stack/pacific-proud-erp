@@ -23,7 +23,7 @@
         </form>
     </div>
 
-    <div class="row text-center">
+   <div class="row text-center">
         <div class="col-md-3">
             <div class="card bg-primary text-white mb-3 shadow-sm">
                 <div class="card-header border-light">매출액 (Revenue)</div>
@@ -33,7 +33,12 @@
         <div class="col-md-3">
             <div class="card bg-secondary text-white mb-3 shadow-sm">
                 <div class="card-header border-light">매출원가 (COGS)</div>
-                <div class="card-body"><h4>- {{ total_cogs|intcomma }} đ</h4></div>
+                <div class="card-body">
+                    <h4>- {{ total_cogs|intcomma }} đ</h4>
+                    <small class="text-light opacity-75" style="font-size: 0.75rem;">
+                        (총 매입액: {{ total_purchase_amount|intcomma }} đ)
+                    </small>
+                </div>
             </div>
         </div>
         <div class="col-md-3">
