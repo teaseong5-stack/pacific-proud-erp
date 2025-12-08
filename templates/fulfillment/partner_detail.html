@@ -5,14 +5,20 @@
 <div class="d-flex justify-content-between align-items-center mb-4">
     <div>
         <h2>🏢 거래처 원장 (Partner Ledger)</h2>
-        <span class="text-muted fs-5">{{ partner.name }}</span>
+        <span class="fs-5 fw-bold text-dark">{{ partner.name }}</span>
         <span class="badge {% if partner.partner_type == 'CLIENT' %}bg-primary{% else %}bg-secondary{% endif %} ms-2">
             {{ partner.get_partner_type_display }}
         </span>
     </div>
-    <a href="{% url 'fulfillment:partner_list' %}" class="btn btn-secondary">
-        <i class="bi bi-arrow-left"></i> 목록으로
-    </a>
+    <div>
+        <button class="btn btn-success me-2" data-bs-toggle="modal" data-bs-target="#addPaymentModal">
+            <i class="bi bi-cash-stack"></i> 
+            {% if partner.partner_type == 'CLIENT' %}수금 등록 (입금){% else %}결제 등록 (출금){% endif %}
+        </button>
+        <a href="{% url 'fulfillment:partner_list' %}" class="btn btn-secondary">
+            <i class="bi bi-arrow-left"></i> 목록
+        </a>
+    </div>
 </div>
 
 <div class="row mb-4">
@@ -58,10 +64,11 @@
                 <tr>
                     <th>날짜</th>
                     <th>구분</th>
-                    <th>내용 (주문/매입번호 등)</th>
+                    <th>내용 (클릭 시 상세)</th>
                     <th class="text-end text-primary">증가(+)</th>
                     <th class="text-end text-danger">감소(-)</th>
                     <th class="text-end table-active">잔액</th>
+                    <th class="text-center">관리</th>
                 </tr>
             </thead>
             <tbody>
@@ -72,31 +79,81 @@
                     <td></td>
                     <td></td>
                     <td class="text-end fw-bold">{{ partner.initial_balance|intcomma }} đ</td>
+                    <td></td>
                 </tr>
 
                 {% for row in ledger_data %}
                 <tr>
                     <td>{{ row.date|date:"Y-m-d" }}</td>
                     <td>
-                        {% if '매출' in row.type or '매입' in row.type %}
-                            <span class="badge bg-info text-dark">{{ row.type }}</span>
+                        {% if row.data_type == 'order' %} <span class="badge bg-primary">매출</span>
+                        {% elif row.data_type == 'purchase' %} <span class="badge bg-secondary">매입</span>
+                        {% else %} <span class="badge bg-success">결제</span> {% endif %}
+                    </td>
+                    
+                    <td>
+                        {% if row.data_type == 'order' %}
+                            <a href="{% url 'fulfillment:order_update' row.obj.id %}" class="text-decoration-none fw-bold text-dark">
+                                {{ row.desc }} <i class="bi bi-box-arrow-up-right small text-muted"></i>
+                            </a>
+                        {% elif row.data_type == 'purchase' %}
+                            <a href="{% url 'fulfillment:purchase_update' row.obj.id %}" class="text-decoration-none fw-bold text-dark">
+                                {{ row.desc }} <i class="bi bi-box-arrow-up-right small text-muted"></i>
+                            </a>
                         {% else %}
-                            <span class="badge bg-success">{{ row.type }}</span>
+                            {{ row.desc }}
                         {% endif %}
                     </td>
-                    <td>{{ row.desc }}</td>
                     
                     <td class="text-end text-primary">
                         {% if row.change > 0 %}{{ row.change|intcomma }}{% endif %}
                     </td>
                     <td class="text-end text-danger">
-                        {% if row.change < 0 %}{{ row.change|stringformat:"d"|slice:"1:"|intcomma }}{% endif %} </td>
-                    
+                        {% if row.change < 0 %}{{ row.change|stringformat:"d"|slice:"1:"|intcomma }}{% endif %}
+                    </td>
                     <td class="text-end fw-bold table-active">{{ row.balance|intcomma }} đ</td>
+                    
+                    <td class="text-center">
+                        {% if row.data_type == 'payment' %}
+                            <a href="{% url 'fulfillment:payment_update' row.obj.id %}" class="btn btn-sm btn-outline-primary py-0"><i class="bi bi-pencil"></i></a>
+                            <a href="{% url 'fulfillment:payment_delete' row.obj.id %}" class="btn btn-sm btn-outline-danger py-0"><i class="bi bi-trash"></i></a>
+                        {% elif row.data_type == 'order' %}
+                            <a href="{% url 'fulfillment:order_update' row.obj.id %}" class="btn btn-sm btn-outline-secondary py-0" title="주문수정"><i class="bi bi-pencil-square"></i></a>
+                        {% elif row.data_type == 'purchase' %}
+                            <a href="{% url 'fulfillment:purchase_update' row.obj.id %}" class="btn btn-sm btn-outline-secondary py-0" title="발주수정"><i class="bi bi-pencil-square"></i></a>
+                        {% endif %}
+                    </td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
+    </div>
+</div>
+
+<div class="modal fade" id="addPaymentModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title">💰 입출금/결제 등록</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" action="{% url 'fulfillment:partner_payment_create' partner.id %}">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="mb-3"><label class="form-label fw-bold">거래일자</label>{{ form.date }}</div>
+                    <div class="mb-3"><label class="form-label fw-bold">구분 (입금/출금)</label>{{ form.payment_type }}</div>
+                    <div class="mb-3"><label class="form-label fw-bold">금액</label>
+                        <div class="input-group">{{ form.amount }}<span class="input-group-text">đ</span></div>
+                    </div>
+                    <div class="mb-3"><label class="form-label fw-bold">결제수단</label>{{ form.method }}</div>
+                    <div class="mb-3"><label class="form-label fw-bold">적요 (메모)</label>{{ form.memo }}</div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">취소</button>
+                    <button type="submit" class="btn btn-success">등록 완료</button>
+                </div>
+            </form>
+        </div>
     </div>
 </div>
 {% endblock %}

@@ -39,6 +39,9 @@ urlpatterns = [
     path('partners/update/<int:pk>/', views.partner_update, name='partner_update'),
     path('partners/delete/<int:pk>/', views.partner_delete, name='partner_delete'),
     path('partners/<int:pk>/', views.partner_detail, name='partner_detail'),
+    path('partners/<int:pk>/payment/create/', views.partner_payment_create, name='partner_payment_create'),
+    path('payment/update/<int:pk>/', views.payment_update, name='payment_update'),
+    path('payment/delete/<int:pk>/', views.payment_delete, name='payment_delete'),
     
     # 재고 관리
     path('inventory/update/<int:pk>/', views.inventory_update, name='inventory_update'),

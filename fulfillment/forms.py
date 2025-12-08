@@ -227,3 +227,16 @@ class LocationForm(forms.ModelForm):
             'code': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '예: A-01-01'}),
             'is_active': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         }
+        
+class PaymentQuickForm(forms.ModelForm):
+    """거래처 상세 화면용 간편 입출금 폼"""
+    class Meta:
+        model = Payment
+        fields = ['date', 'payment_type', 'amount', 'method', 'memo']
+        widgets = {
+            'date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+            'payment_type': forms.Select(attrs={'class': 'form-select'}),
+            'amount': forms.NumberInput(attrs={'class': 'form-control', 'placeholder': '금액 입력'}),
+            'method': forms.Select(attrs={'class': 'form-select'}),
+            'memo': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '적요 (예: 11월분 결제)'}),
+        }        
