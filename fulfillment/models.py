@@ -285,14 +285,66 @@ class Payroll(models.Model):
             super().save(update_fields=['related_expense'])
 
 class Payment(models.Model):
-    PAYMENT_TYPE = [('INBOUND', '수금'), ('OUTBOUND', '지급')]
-    partner = models.ForeignKey(Partner, on_delete=models.CASCADE)
-    date = models.DateField(default=timezone.now)
-    payment_type = models.CharField(max_length=10, choices=PAYMENT_TYPE)
-    amount = models.DecimalField(max_digits=12, decimal_places=0)
-    method = models.CharField(max_length=20, default='CASH', choices=[('CASH','현금'), ('BANK','계좌'), ('CARD','카드')])
-    memo = models.CharField(max_length=100, blank=True)
-    def __str__(self): return f"{self.partner.name} - {self.amount}"
+    """자금 입출금 내역 (거래처 원장)"""
+    PAYMENT_TYPE = [
+        ('INBOUND', '수금 (입금)'),   # 매출처에서 돈 받음 -> 통장 잔액 증가
+        ('OUTBOUND', '지급 (출금)'),  # 매입처에 돈 줌 -> 통장 잔액 감소
+    ]
+    
+    partner = models.ForeignKey('Partner', on_delete=models.CASCADE, verbose_name="거래처")
+    date = models.DateField(default=timezone.now, verbose_name="거래일자")
+    payment_type = models.CharField(max_length=10, choices=PAYMENT_TYPE, verbose_name="구분")
+    amount = models.DecimalField(max_digits=12, decimal_places=0, verbose_name="금액")
+    method = models.CharField(max_length=20, default='CASH', choices=[('CASH','현금'), ('BANK','계좌이체'), ('CARD','카드')], verbose_name="결제수단")
+    memo = models.CharField(max_length=100, blank=True, verbose_name="적요")
+    
+    # ★ 추가됨: 연동할 법인 계좌
+    bank_account = models.ForeignKey('BankAccount', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="연동 계좌")
+    
+    # 내부적으로 생성된 BankTransaction을 추적하기 위한 필드 (선택사항, 1:1 연결)
+    related_bank_trx = models.OneToOneField('BankTransaction', on_delete=models.SET_NULL, null=True, blank=True, editable=False)
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        
+        # 계좌가 선택되었다면 -> 통장 내역(BankTransaction) 자동 생성/수정
+        if self.bank_account:
+            # 1. 거래 유형 결정 (Partner Payment 기준 -> Bank 기준 변환)
+            # 수금(INBOUND) -> 통장에선 입금(DEPOSIT)
+            # 지급(OUTBOUND) -> 통장에선 출금(WITHDRAWAL)
+            trx_type = 'DEPOSIT' if self.payment_type == 'INBOUND' else 'WITHDRAWAL'
+            
+            # 적요 자동 생성 (예: [수금] 강남포차)
+            desc = f"[{self.get_payment_type_display()}] {self.partner.name}"
+            if self.memo:
+                desc += f" - {self.memo}"
+
+            if self.related_bank_trx:
+                # 이미 연결된 내역이 있으면 업데이트
+                self.related_bank_trx.bank_account = self.bank_account
+                self.related_bank_trx.date = self.date
+                self.related_bank_trx.transaction_type = trx_type
+                self.related_bank_trx.amount = self.amount
+                self.related_bank_trx.description = desc
+                self.related_bank_trx.save()
+            else:
+                # 없으면 새로 생성
+                # BankTransaction 모델을 가져와야 함 (문자열 참조 회피)
+                from .models import BankTransaction 
+                
+                trx = BankTransaction.objects.create(
+                    bank_account=self.bank_account,
+                    date=self.date,
+                    transaction_type=trx_type,
+                    amount=self.amount,
+                    description=desc
+                )
+                self.related_bank_trx = trx
+                # 다시 저장 (연결 정보 업데이트)
+                super().save(update_fields=['related_bank_trx'])
+
+    def __str__(self):
+        return f"[{self.get_payment_type_display()}] {self.partner.name} - {self.amount}"
 
 class WorkLog(models.Model):
     date = models.DateField(default=timezone.now)

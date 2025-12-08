@@ -3,10 +3,11 @@ from django.forms import inlineformset_factory
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.models import User
 
+# 모델 전체 임포트
 from .models import (
     Inventory, Product, Location, Partner, Purchase, PurchaseItem, 
     Order, OrderItem, Employee, Payroll, Expense, Payment, CompanyInfo,
-    BankAccount, BankTransaction, WorkLog, Zone
+    BankAccount, BankTransaction, WorkLog
 )
 
 # --- 회원가입 폼 ---
@@ -129,7 +130,7 @@ class PayrollForm(forms.ModelForm):
             'deduction': forms.NumberInput(attrs={'class': 'form-control'}),
         }
 
-# --- 자금/업무일지 폼 (★ BankTransactionForm 포함) ---
+# --- 자금/업무일지 폼 (★ BankTransactionForm, PaymentQuickForm 포함) ---
 class BankAccountForm(forms.ModelForm):
     class Meta:
         model = BankAccount
@@ -164,6 +165,22 @@ class WorkLogForm(forms.ModelForm):
             'content': forms.Textarea(attrs={'class': 'form-control', 'rows': 5}),
             'issues': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
         }
+
+class PaymentQuickForm(forms.ModelForm):
+    class Meta:
+        model = Payment
+        fields = ['date', 'payment_type', 'amount', 'method', 'bank_account', 'memo']
+        widgets = {
+            'date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+            'payment_type': forms.Select(attrs={'class': 'form-select'}),
+            'amount': forms.NumberInput(attrs={'class': 'form-control'}),
+            'method': forms.Select(attrs={'class': 'form-select'}),
+            'bank_account': forms.Select(attrs={'class': 'form-select'}),
+            'memo': forms.TextInput(attrs={'class': 'form-control'}),
+        }
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['bank_account'].queryset = BankAccount.objects.filter(is_active=True)
 
 # --- 발주/주문 폼셋 ---
 class PurchaseForm(forms.ModelForm):
@@ -202,41 +219,7 @@ class OrderItemForm(forms.ModelForm):
         model = OrderItem
         fields = ['product', 'quantity']
         widgets = {
-            'product': forms.Select(attrs={'class': 'form-select product-select', 'onchange': 'updateRow(this)'}),
-            'quantity': forms.NumberInput(attrs={'class': 'form-control quantity-input', 'oninput': 'updateRow(this)'}),
+            'product': forms.Select(attrs={'class': 'form-select product-select', 'onchange': 'updateOrderRow(this)'}),
+            'quantity': forms.NumberInput(attrs={'class': 'form-control quantity-input', 'oninput': 'updateOrderRow(this)'}),
         }
 OrderCreateFormSet = inlineformset_factory(Order, OrderItem, form=OrderItemForm, extra=5, can_delete=True)
-
-class ZoneForm(forms.ModelForm):
-    """창고 구역 등록 폼"""
-    class Meta:
-        model = Zone
-        fields = ['name', 'storage_type']
-        widgets = {
-            'name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '예: A구역 냉동고'}),
-            'storage_type': forms.Select(attrs={'class': 'form-select'}),
-        }
-
-class LocationForm(forms.ModelForm):
-    """세부 위치 등록 폼"""
-    class Meta:
-        model = Location
-        fields = ['zone', 'code', 'is_active']
-        widgets = {
-            'zone': forms.Select(attrs={'class': 'form-select'}),
-            'code': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '예: A-01-01'}),
-            'is_active': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-        }
-        
-class PaymentQuickForm(forms.ModelForm):
-    """거래처 상세 화면용 간편 입출금 폼"""
-    class Meta:
-        model = Payment
-        fields = ['date', 'payment_type', 'amount', 'method', 'memo']
-        widgets = {
-            'date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
-            'payment_type': forms.Select(attrs={'class': 'form-select'}),
-            'amount': forms.NumberInput(attrs={'class': 'form-control', 'placeholder': '금액 입력'}),
-            'method': forms.Select(attrs={'class': 'form-select'}),
-            'memo': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '적요 (예: 11월분 결제)'}),
-        }        

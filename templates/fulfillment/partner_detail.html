@@ -140,13 +140,45 @@
             <form method="post" action="{% url 'fulfillment:partner_payment_create' partner.id %}">
                 {% csrf_token %}
                 <div class="modal-body">
-                    <div class="mb-3"><label class="form-label fw-bold">거래일자</label>{{ form.date }}</div>
-                    <div class="mb-3"><label class="form-label fw-bold">구분 (입금/출금)</label>{{ form.payment_type }}</div>
-                    <div class="mb-3"><label class="form-label fw-bold">금액</label>
-                        <div class="input-group">{{ form.amount }}<span class="input-group-text">đ</span></div>
+                    <div class="row">
+                        <div class="col-6 mb-3">
+                            <label class="form-label fw-bold">거래일자</label>
+                            {{ form.date }}
+                        </div>
+                        <div class="col-6 mb-3">
+                            <label class="form-label fw-bold">구분 (입금/출금)</label>
+                            {{ form.payment_type }}
+                        </div>
                     </div>
-                    <div class="mb-3"><label class="form-label fw-bold">결제수단</label>{{ form.method }}</div>
-                    <div class="mb-3"><label class="form-label fw-bold">적요 (메모)</label>{{ form.memo }}</div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">금액</label>
+                        <div class="input-group">
+                            {{ form.amount }}
+                            <span class="input-group-text">đ</span>
+                        </div>
+                    </div>
+
+                    <div class="mb-3 p-3 bg-light rounded border">
+                        <label class="form-label fw-bold text-primary">
+                            <i class="bi bi-bank me-1"></i> 연동할 법인 계좌
+                        </label>
+                        {{ form.bank_account }}
+                        <div class="form-text small">
+                            * 선택 시 해당 통장의 입/출금 내역에도 자동 기록됩니다.
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-6 mb-3">
+                            <label class="form-label fw-bold">결제수단</label>
+                            {{ form.method }}
+                        </div>
+                        <div class="col-6 mb-3">
+                            <label class="form-label fw-bold">적요 (메모)</label>
+                            {{ form.memo }}
+                        </div>
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">취소</button>
