@@ -486,6 +486,76 @@ def partner_delete(request, pk):
     obj = get_object_or_404(Partner, pk=pk)
     if request.method == 'POST': obj.delete(); return redirect('fulfillment:partner_list')
     return render(request, 'fulfillment/common_delete.html', {'object': obj, 'back_url': 'fulfillment:partner_list'})
+@login_required
+def partner_detail(request, pk):
+    partner = get_object_or_404(Partner, pk=pk)
+    transactions = []
+    
+    # 1. 매출 내역
+    if partner.partner_type in ['CLIENT', 'BOTH']:
+        orders = partner.order_set.filter(status='SHIPPED')
+        for o in orders:
+            o.data_type='order'; o.type_label="매출"; o.amount=o.total_revenue; o.date=o.order_date.date(); o.link_id=o.id
+            transactions.append(o)
+    
+    # 2. 매입 내역
+    if partner.partner_type in ['SUPPLIER', 'BOTH']:
+        purchases = partner.purchase_set.filter(status='RECEIVED')
+        for p in purchases:
+            p.data_type='purchase'; p.type_label="매입"; p.amount=p.total_amount; p.date=p.purchase_date; p.link_id=p.id
+            transactions.append(p)
+    
+    # 3. 결제(입출금) 내역
+    for pay in partner.payment_set.all():
+        pay.data_type='payment'; pay.type_label=pay.get_payment_type_display(); pay.link_id=pay.id
+        pay.calc_amount = -pay.amount
+        transactions.append(pay)
+
+    # 4. 정렬 및 잔액 계산
+    transactions.sort(key=lambda x: x.date)
+    running = partner.initial_balance
+    ledger = []
+    for t in transactions:
+        change = getattr(t, 'calc_amount', t.amount)
+        running += change
+        ledger.append({
+            'obj': t, 'date': t.date, 'type': t.type_label, 'data_type': getattr(t, 'data_type', 'payment'),
+            'desc': str(t), 'change': change, 'balance': running
+        })
+    
+    # 5. 팝업 폼
+    initial = {'date': timezone.now().date()}
+    if partner.partner_type == 'CLIENT': initial['payment_type'] = 'INBOUND'
+    elif partner.partner_type == 'SUPPLIER': initial['payment_type'] = 'OUTBOUND'
+    form = PaymentQuickForm(initial=initial)
+    
+    return render(request, 'fulfillment/partner_detail.html', {'partner': partner, 'ledger_data': ledger, 'form': form})
+
+@login_required
+def partner_payment_create(request, pk):
+    partner = get_object_or_404(Partner, pk=pk)
+    if request.method == 'POST':
+        form = PaymentQuickForm(request.POST)
+        if form.is_valid():
+            pay = form.save(commit=False)
+            pay.partner = partner; pay.save()
+    return redirect('fulfillment:partner_detail', pk=pk)
+
+@login_required
+def payment_update(request, pk):
+    pay = get_object_or_404(Payment, pk=pk)
+    if request.method == 'POST':
+        form = PaymentQuickForm(request.POST, instance=pay)
+        if form.is_valid(): form.save(); return redirect('fulfillment:partner_detail', pk=pay.partner.id)
+    else: form = PaymentQuickForm(instance=pay)
+    return render(request, 'fulfillment/common_form.html', {'form': form, 'title': '입출금 수정'})
+
+@login_required
+def payment_delete(request, pk):
+    pay = get_object_or_404(Payment, pk=pk)
+    pid = pay.partner.id
+    if request.method == 'POST': pay.delete(); return redirect('fulfillment:partner_detail', pk=pid)
+    return render(request, 'fulfillment/common_delete.html', {'object': pay, 'back_url': 'fulfillment:partner_list'})    
 
 @login_required
 def product_list(request):
