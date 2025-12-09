@@ -7,7 +7,7 @@ from django.contrib.auth.models import User
 from .models import (
     Inventory, Product, Location, Partner, Purchase, PurchaseItem, 
     Order, OrderItem, Employee, Payroll, Expense, Payment, CompanyInfo,
-    BankAccount, BankTransaction, WorkLog
+    BankAccount, BankTransaction, WorkLog, Zone
 )
 
 # --- 회원가입 폼 ---
@@ -130,7 +130,7 @@ class PayrollForm(forms.ModelForm):
             'deduction': forms.NumberInput(attrs={'class': 'form-control'}),
         }
 
-# --- 자금/업무일지 폼 (★ BankTransactionForm, PaymentQuickForm 포함) ---
+# --- 자금/업무일지 폼 ---
 class BankAccountForm(forms.ModelForm):
     class Meta:
         model = BankAccount
@@ -223,3 +223,23 @@ class OrderItemForm(forms.ModelForm):
             'quantity': forms.NumberInput(attrs={'class': 'form-control quantity-input', 'oninput': 'updateOrderRow(this)'}),
         }
 OrderCreateFormSet = inlineformset_factory(Order, OrderItem, form=OrderItemForm, extra=5, can_delete=True)
+
+# --- ★ 추가된 부분: 창고/위치 관리 폼 ---
+class ZoneForm(forms.ModelForm):
+    class Meta:
+        model = Zone
+        fields = ['name', 'storage_type']
+        widgets = {
+            'name': forms.TextInput(attrs={'class': 'form-control'}),
+            'storage_type': forms.Select(attrs={'class': 'form-select'}),
+        }
+
+class LocationForm(forms.ModelForm):
+    class Meta:
+        model = Location
+        fields = ['zone', 'code', 'is_active']
+        widgets = {
+            'zone': forms.Select(attrs={'class': 'form-select'}),
+            'code': forms.TextInput(attrs={'class': 'form-control'}),
+            'is_active': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+        }
