@@ -16,14 +16,14 @@ from .models import (
     PickingList, Expense, Employee, Payroll, Payment, Zone, Location,
     CompanyInfo, BankAccount, BankTransaction, WorkLog
 )
-# ★ 폼 전체 임포트 (ZoneForm, LocationForm 추가됨!)
+# ★ 폼 전체 임포트 (ZoneForm, LocationForm이 여기에 꼭 있어야 합니다!)
 from .forms import (
     InboundForm, ProductForm, PartnerForm, 
     InventoryForm, PurchaseForm, OrderForm,
     ExpenseForm, EmployeeForm, PayrollForm, CompanyInfoForm,
     BankAccountForm, WorkLogForm, BankTransactionForm, SignUpForm,
     PurchaseCreateFormSet, OrderCreateFormSet, PaymentQuickForm,
-    ZoneForm, LocationForm  # <--- 이 부분이 빠져서 에러가 났던 것입니다.
+    ZoneForm, LocationForm  # <--- 이 부분이 핵심입니다.
 )
 # 유틸리티
 from .utils import generate_barcode_image, export_to_excel
@@ -143,6 +143,7 @@ def process_weight(request, order_id):
             w = request.POST.get(f'weight_{picking.id}')
             if w: 
                 picking.picked_weight = float(w); picking.picked = True; picking.save()
+            # 재고 차감 로직은 services.py(피킹지시)에서 수행됨. 중복차감 방지.
         
         total_rev = 0
         real_cogs = 0
@@ -170,20 +171,20 @@ def generate_invoice_pdf(request, order_id):
     if not my_company: my_company = CompanyInfo(name="(회사정보 미설정)")
     
     current_total = order.total_revenue
-    initial = order.client.initial_balance if order.client else 0
-    past_sales = 0
-    total_paid = 0
+    total_balance = 0
+    previous_balance = 0
     if order.client:
+        initial = order.client.initial_balance
         past_sales = Order.objects.filter(client=order.client, status='SHIPPED').filter(Q(order_date__lt=order.order_date)|Q(order_date=order.order_date, id__lt=order.id)).aggregate(s=Sum('total_revenue'))['s'] or 0
         total_paid = Payment.objects.filter(partner=order.client, payment_type='INBOUND', date__lte=order.order_date.date()).aggregate(s=Sum('amount'))['s'] or 0
-    
-    prev_bal = (initial + past_sales) - total_paid
-    total_bal = prev_bal + current_total
+        previous_balance = (initial + past_sales) - total_paid
+        total_balance = previous_balance + current_total
 
-    return render(request, 'fulfillment/invoice_pdf.html', {
+    context = {
         'order': order, 'items': items, 'company': my_company, 'today': timezone.now().date(),
-        'previous_balance': prev_bal, 'total_balance': total_bal
-    })
+        'previous_balance': previous_balance, 'total_balance': total_balance,
+    }
+    return render(request, 'fulfillment/invoice_pdf.html', context)
 
 # --- 3. 회사 정보 설정 ---
 @login_required
@@ -516,7 +517,6 @@ def product_delete(request, pk):
     if request.method == 'POST': obj.delete(); return redirect('fulfillment:product_list')
     return render(request, 'fulfillment/common_delete.html', {'object': obj, 'back_url': 'fulfillment:product_list'})
 
-# --- 자금/업무일지/위치 (신규 기능 뷰) ---
 @login_required
 def bank_list(request):
     accounts = BankAccount.objects.filter(is_active=True)
@@ -595,67 +595,7 @@ def location_delete(request, pk):
     if request.method == 'POST': obj.delete(); return redirect('fulfillment:location_list')
     return render(request, 'fulfillment/common_delete.html', {'object': obj, 'back_url': 'fulfillment:location_list'})
 
-# --- 상세 원장 (파트너/결제) ---
-@login_required
-def partner_detail(request, pk):
-    partner = get_object_or_404(Partner, pk=pk)
-    transactions = []
-    
-    if partner.partner_type in ['CLIENT', 'BOTH']:
-        orders = partner.order_set.filter(status='SHIPPED')
-        for o in orders:
-            o.data_type='order'; o.type_label="매출"; o.amount=o.total_revenue; o.date=o.order_date.date(); o.link_id=o.id
-            transactions.append(o)
-    if partner.partner_type in ['SUPPLIER', 'BOTH']:
-        purchases = partner.purchase_set.filter(status='RECEIVED')
-        for p in purchases:
-            p.data_type='purchase'; p.type_label="매입"; p.amount=p.total_amount; p.date=p.purchase_date; p.link_id=p.id
-            transactions.append(p)
-    
-    for pay in partner.payment_set.all():
-        pay.data_type='payment'; pay.type_label=pay.get_payment_type_display(); pay.link_id=pay.id
-        pay.calc_amount = -pay.amount
-        transactions.append(pay)
-
-    transactions.sort(key=lambda x: x.date)
-    running = partner.initial_balance
-    ledger = []
-    for t in transactions:
-        change = getattr(t, 'calc_amount', t.amount)
-        running += change
-        ledger.append({'obj': t, 'date': t.date, 'type': t.type_label, 'data_type': getattr(t, 'data_type', 'payment'), 'desc': str(t), 'change': change, 'balance': running})
-    
-    initial = {'date': timezone.now().date()}
-    if partner.partner_type == 'CLIENT': initial['payment_type'] = 'INBOUND'
-    elif partner.partner_type == 'SUPPLIER': initial['payment_type'] = 'OUTBOUND'
-    form = PaymentQuickForm(initial=initial)
-    return render(request, 'fulfillment/partner_detail.html', {'partner': partner, 'ledger_data': ledger, 'form': form})
-
-@login_required
-def partner_payment_create(request, pk):
-    partner = get_object_or_404(Partner, pk=pk)
-    if request.method == 'POST':
-        form = PaymentQuickForm(request.POST)
-        if form.is_valid():
-            pay = form.save(commit=False)
-            pay.partner = partner; pay.save()
-    return redirect('fulfillment:partner_detail', pk=pk)
-@login_required
-def payment_update(request, pk):
-    pay = get_object_or_404(Payment, pk=pk)
-    if request.method == 'POST':
-        form = PaymentQuickForm(request.POST, instance=pay)
-        if form.is_valid(): form.save(); return redirect('fulfillment:partner_detail', pk=pay.partner.id)
-    else: form = PaymentQuickForm(instance=pay)
-    return render(request, 'fulfillment/common_form.html', {'form': form, 'title': '입출금 수정'})
-@login_required
-def payment_delete(request, pk):
-    pay = get_object_or_404(Payment, pk=pk)
-    pid = pay.partner.id
-    if request.method == 'POST': pay.delete(); return redirect('fulfillment:partner_detail', pk=pid)
-    return render(request, 'fulfillment/common_delete.html', {'object': pay, 'back_url': 'fulfillment:partner_list'})
-
-# --- 엑셀 다운로드 (utils import 확인) ---
+# --- 엑셀 다운로드 ---
 @login_required
 def export_inventory_excel(request):
     queryset = Inventory.objects.filter(quantity__gt=0).select_related('product', 'location__zone').order_by('product__name')
