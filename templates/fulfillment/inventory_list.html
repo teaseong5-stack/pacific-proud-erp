@@ -2,103 +2,125 @@
 {% load humanize %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-3">
-    <h2>📦 실시간 재고 현황</h2>
-    
-    <div>
-        <a href="{% url 'fulfillment:export_inventory' %}?{{ request.GET.urlencode }}" class="btn btn-success me-2">
-            <i class="bi bi-file-earmark-excel"></i> 엑셀 다운로드
-        </a>
-        <a href="{% url 'fulfillment:inbound_create' %}" class="btn btn-primary">
-            <i class="bi bi-plus-lg"></i> 입고 등록
-        </a>
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="h4 text-gray-800"><i class="bi bi-boxes me-2"></i>실시간 재고 조회</h2>
+        <div>
+            <a href="{% url 'fulfillment:inbound_create' %}" class="btn btn-primary btn-sm">
+                <i class="bi bi-box-seam me-1"></i> 입고 등록
+            </a>
+        </div>
     </div>
-</div>
 
-<div class="card shadow-sm mb-4 bg-light">
-    <div class="card-body py-3">
-        <form method="get" class="row g-2 align-items-end">
-            <div class="col-md-3">
-                <label class="form-label fw-bold small">상품명</label>
-                <input type="text" name="p_name" class="form-control" value="{{ request.GET.p_name }}" placeholder="상품명 검색">
-            </div>
-
-            <div class="col-md-2">
-                <label class="form-label fw-bold small">SKU</label>
-                <input type="text" name="sku" class="form-control" value="{{ request.GET.sku }}" placeholder="SKU 코드">
-            </div>
-
-            <div class="col-md-2">
-                <label class="form-label fw-bold small">보관 위치</label>
-                <select name="location" class="form-select search-select">
-                    <option value="">전체 위치</option>
-                    {% for loc in locations %}
-                        <option value="{{ loc.id }}" {% if request.GET.location == loc.id|stringformat:"s" %}selected{% endif %}>
-                            {{ loc.code }} ({{ loc.zone.name }})
-                        </option>
-                    {% endfor %}
-                </select>
-            </div>
-
-            <div class="col-md-3">
-                <label class="form-label fw-bold small">유통기한 범위</label>
-                <div class="input-group">
-                    <input type="date" name="start_date" class="form-control" value="{{ request.GET.start_date }}">
-                    <span class="input-group-text">~</span>
-                    <input type="date" name="end_date" class="form-control" value="{{ request.GET.end_date }}">
+    <div class="card shadow mb-4">
+        <div class="card-body bg-light">
+            <form method="get" class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label small fw-bold">상품명</label>
+                    <input type="text" name="p_name" class="form-control" value="{{ request.GET.p_name }}" placeholder="상품명 검색">
                 </div>
-            </div>
+                <div class="col-md-2">
+                    <label class="form-label small fw-bold">SKU</label>
+                    <input type="text" name="sku" class="form-control" value="{{ request.GET.sku }}" placeholder="SKU 번호">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small fw-bold">보관 위치</label>
+                    <select name="location" class="form-select search-select">
+                        <option value="">전체 위치</option>
+                        {% for loc in locations %}
+                        <option value="{{ loc.id }}" {% if request.GET.location == loc.id|stringformat:"s" %}selected{% endif %}>
+                            {{ loc.zone.name }} - {{ loc.code }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-4 d-flex align-items-end gap-2">
+                    <button type="submit" class="btn btn-secondary flex-grow-1"><i class="bi bi-search"></i> 검색</button>
+                    <a href="{% url 'fulfillment:inventory_list' %}" class="btn btn-outline-secondary"><i class="bi bi-arrow-counterclockwise"></i> 초기화</a>
+                    
+                    <a href="{% url 'fulfillment:export_inventory_excel' %}?{{ request.GET.urlencode }}" class="btn btn-success">
+                        <i class="bi bi-file-earmark-excel"></i> 엑셀
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
 
-            <div class="col-md-2 d-flex gap-2">
-                <button type="submit" class="btn btn-secondary flex-fill">
-                    <i class="bi bi-search"></i> 조회
-                </button>
-                <a href="{% url 'fulfillment:inventory_list' %}" class="btn btn-outline-secondary">
-                    <i class="bi bi-arrow-counterclockwise"></i>
-                </a>
+    <div class="card shadow">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0" style="min-width: 1000px;">
+                    <thead class="bg-light text-secondary">
+                        <tr>
+                            <th class="ps-4">상품명</th>
+                            <th>SKU</th>
+                            <th>위치 (Zone-Code)</th>
+                            <th>배치 번호 (Lot)</th>
+                            <th class="text-end">재고 수량</th>
+                            <th>유통기한</th>
+                            <th>관리</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for inv in inventories %}
+                        <tr>
+                            <td class="ps-4 fw-bold text-primary">{{ inv.product.name }}</td>
+                            <td>{{ inv.product.sku }}</td>
+                            <td>
+                                <span class="badge bg-light text-dark border">
+                                    {{ inv.location.zone.name }} - {{ inv.location.code }}
+                                </span>
+                            </td>
+                            <td class="small text-muted">{{ inv.batch_number }}</td>
+                            <td class="text-end fw-bold pe-4" style="font-size: 1.1em;">
+                                {{ inv.quantity|intcomma }} {{ inv.product.unit }}
+                            </td>
+                            <td>
+                                {% if inv.expiry_date %}
+                                    {% if inv.expiry_date <= today|date:"Y-m-d" %} 
+                                        <span class="text-danger fw-bold"><i class="bi bi-exclamation-circle-fill"></i> {{ inv.expiry_date|date:"Y-m-d" }}</span>
+                                    {% else %}
+                                        {{ inv.expiry_date|date:"Y-m-d" }}
+                                    {% endif %}
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="btn-group">
+                                    <a href="{% url 'fulfillment:inventory_update' inv.id %}" class="btn btn-sm btn-outline-primary">
+                                        <i class="bi bi-pencil-square"></i> 수정
+                                    </a>
+                                    <a href="{% url 'fulfillment:print_label' inv.id %}" class="btn btn-sm btn-outline-dark" target="_blank">
+                                        <i class="bi bi-upc-scan"></i> 라벨
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="7" class="text-center py-5 text-muted">
+                                <i class="bi bi-box-seam display-4 d-block mb-3 text-secondary"></i>
+                                현재 보관 중인 재고가 없습니다.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
             </div>
-        </form>
+        </div>
     </div>
 </div>
 
-<div class="card shadow-sm">
-    <div class="card-body p-0">
-        <table class="table table-hover align-middle mb-0">
-            <thead class="table-light">
-                <tr>
-                    <th>상품명</th>
-                    <th>SKU</th>
-                    <th>현재위치</th>
-                    <th>배치번호</th>
-                    <th>유통기한</th>
-                    <th class="text-end">수량</th>
-                    <th class="text-center">관리</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for item in inventories %}
-                <tr>
-                    <td class="fw-bold">{{ item.product.name }}</td>
-                    <td>{{ item.product.sku }}</td>
-                    <td><span class="badge bg-secondary">{{ item.location.code }}</span></td>
-                    <td>{{ item.batch_number }}</td>
-                    <td {% if item.is_expired %}class="text-danger fw-bold"{% endif %}>
-                        {{ item.expiry_date|date:"Y-m-d" }}
-                        {% if item.is_expired %}(만료){% endif %}
-                    </td>
-                    <td class="text-end fw-bold" style="font-size: 1.1em;">
-                        {{ item.quantity|intcomma }} {{ item.product.unit }}
-                    </td>
-                    <td class="text-center">
-                        <a href="{% url 'fulfillment:inventory_update' item.id %}" class="btn btn-sm btn-outline-primary me-1" title="수정"><i class="bi bi-pencil-square"></i></a>
-                        <a href="{% url 'fulfillment:inventory_delete' item.id %}" class="btn btn-sm btn-outline-danger" title="삭제"><i class="bi bi-trash"></i></a>
-                    </td>
-                </tr>
-                {% empty %}
-                <tr><td colspan="7" class="text-center p-4">검색 조건에 맞는 재고가 없습니다.</td></tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-</div>
+<script>
+    $(document).ready(function() {
+        $('.search-select').select2({
+            theme: 'bootstrap-5',
+            width: '100%',
+            placeholder: '선택',
+            allowClear: true
+        });
+    });
+</script>
+
 {% endblock %}

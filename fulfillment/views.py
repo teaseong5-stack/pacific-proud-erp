@@ -340,36 +340,42 @@ def purchase_delete(request, pk):
     obj = get_object_or_404(Purchase, pk=pk)
     if request.method == 'POST': obj.delete(); return redirect('fulfillment:purchase_list')
     return render(request, 'fulfillment/common_delete.html', {'object': obj, 'back_url': 'fulfillment:purchase_list'})
-
 @login_required
 def order_list(request):
+    """주문 현황 리스트 + 신규 주문 등록 팝업 처리"""
+    
+    # 1. 기존 리스트 조회 로직
     orders = Order.objects.select_related('client').order_by('-order_date')
-    start_date = request.GET.get('start_date'); end_date = request.GET.get('end_date')
-    client_id = request.GET.get('client'); status = request.GET.get('status')
+    
+    start_date = request.GET.get('start_date')
+    end_date = request.GET.get('end_date')
+    client_id = request.GET.get('client')
+    status = request.GET.get('status')
+
     if start_date: orders = orders.filter(order_date__date__gte=start_date)
     if end_date: orders = orders.filter(order_date__date__lte=end_date)
     if client_id: orders = orders.filter(client_id=client_id)
     if status: orders = orders.filter(status=status)
+
+    # 2. 팝업창에 필요한 데이터 준비
     clients = Partner.objects.filter(partner_type__in=['CLIENT', 'BOTH'])
     products_all = Product.objects.all()
-    form = OrderForm()
-    return render(request, 'fulfillment/order_list.html', {
-        'orders': orders, 'form': form, 'products_all': products_all, 'clients': clients
-    })
-@login_required
-def order_create(request):
-    if request.method == 'POST':
-        form = OrderForm(request.POST)
-        formset = OrderCreateFormSet(request.POST)
-        if form.is_valid() and formset.is_valid():
-            order = form.save(commit=False); order.status = 'PENDING'; order.save()
-            items = formset.save(commit=False); total_rev = 0
-            for item in items:
-                item.order = order; item.final_amount = item.quantity * item.product.price; item.save()
-                total_rev += item.final_amount
-            order.total_revenue = total_rev; order.save()
-            return redirect('fulfillment:order_list')
-    return redirect('fulfillment:order_list')
+    
+    # 3. ★ 신규 등록용 폼 & 폼셋 생성 (팝업용 빈 종이 준비)
+    form = OrderForm(initial={'status': 'PENDING'}) # 기본 상태: 주문접수
+    
+    # prefix='items'를 넣어 자바스크립트가 찾기 쉽게 만듭니다.
+    # queryset=...none()을 해야 빈 줄만 나옵니다.
+    formset = OrderCreateFormSet(queryset=OrderItem.objects.none(), prefix='items')
+
+    context = {
+        'orders': orders,
+        'clients': clients,
+        'products_all': products_all,
+        'form': form,
+        'formset': formset # ★ 핵심 데이터
+    }
+    return render(request, 'fulfillment/order_list.html', context)
 @login_required
 def order_update(request, pk):
     order = get_object_or_404(Order, pk=pk)
