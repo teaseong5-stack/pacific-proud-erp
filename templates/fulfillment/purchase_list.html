@@ -155,22 +155,9 @@
                                     </thead>
                                     <tbody id="formset-container">
                                         {{ formset.management_form }}
+                                        
                                         {% for form in formset %}
-                                            <tr class="item-row">
-                                                {{ form.id }}
-                                                <td class="text-start px-2">{{ form.product }}</td>
-                                                <td class="px-2">{{ form.quantity }}</td>
-                                                <td class="px-2">
-                                                    {{ form.target_location }}
-                                                </td>
-                                                <td class="px-2">{{ form.expiry_date }}</td>
-                                                <td>
-                                                    <div class="form-check d-flex justify-content-center">
-                                                        {{ form.DELETE }}
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        {% endfor %}
+                                            {% endfor %}
                                     </tbody>
                                 </table>
                             </div>
@@ -195,7 +182,8 @@
             {{ formset.empty_form.id }}
             <td class="text-start px-2">{{ formset.empty_form.product }}</td>
             <td class="px-2">{{ formset.empty_form.quantity }}</td>
-            <td class="px-2">{{ formset.empty_form.target_location }}</td> <td class="px-2">{{ formset.empty_form.expiry_date }}</td>
+            <td class="px-2">{{ formset.empty_form.target_location }}</td>
+            <td class="px-2">{{ formset.empty_form.expiry_date }}</td>
             <td>
                 <div class="form-check d-flex justify-content-center">
                     {{ formset.empty_form.DELETE }}
@@ -218,11 +206,26 @@
 
         // 2. 동적 폼셋 추가 (Add Row)
         const addItemBtn = document.getElementById('add-item-btn');
-        const totalForms = document.getElementById('id_purchaseitem_set-TOTAL_FORMS');
+        // ★ 중요: View에서 prefix='items'를 줬으므로 ID는 'id_items-TOTAL_FORMS'가 됨
+        const totalForms = document.getElementById('id_items-TOTAL_FORMS'); 
         const formContainer = document.getElementById('formset-container');
         const emptyRowHtml = document.getElementById('empty-form-row').innerHTML;
 
+        // 초기 로딩 시 기본 1줄 추가
+        if (totalForms && parseInt(totalForms.value) === 0) {
+             addItem();
+        }
+
         addItemBtn.addEventListener('click', function() {
+            addItem();
+        });
+
+        function addItem() {
+            if (!totalForms) {
+                console.error("Error: Management Form not found! (id_items-TOTAL_FORMS)");
+                return;
+            }
+
             let formIdx = totalForms.value;
             // __prefix__ 를 현재 인덱스로 치환
             let newRowHtml = emptyRowHtml.replace(/__prefix__/g, formIdx);
@@ -240,14 +243,12 @@
                 dropdownParent: $('#createPurchaseModal'),
                 width: '100%'
             });
-        });
+        }
     });
 </script>
 
 <style>
-    /* 테이블 안의 인풋 높이 조절 */
     .table .form-control, .table .form-select { font-size: 0.9rem; padding: 0.4rem; }
-    /* Select2 컨테이너 높이 맞춤 */
     .select2-container .select2-selection--single { height: 36px !important; }
     .select2-container--bootstrap-5 .select2-selection--single .select2-selection__rendered { line-height: 34px; }
 </style>

@@ -278,25 +278,24 @@ def purchase_list(request):
     if supplier_id: purchases = purchases.filter(supplier_id=supplier_id)
     if status: purchases = purchases.filter(status=status)
 
-    # 2. 팝업창에 필요한 데이터 준비
+   # 2. 팝업창 데이터
     suppliers = Partner.objects.filter(partner_type__in=['SUPPLIER', 'BOTH'])
     products_all = Product.objects.all()
     locations_all = Location.objects.filter(is_active=True)
     
-    # 3. ★ 신규 등록용 폼 & 폼셋 생성 (이 부분이 빠져있었습니다!)
+    # 3. ★ 수정된 부분: prefix='items' 추가 (이름표 고정)
     form = PurchaseForm(initial={'purchase_date': timezone.now().date()})
     
-    # 여기서 queryset=...none()을 해야 빈 칸들만 나옵니다. (안 하면 기존 DB 내용이 다 나옴)
-    formset = PurchaseCreateFormSet(queryset=PurchaseItem.objects.none())
+    # prefix='items'를 넣으면 HTML ID가 'id_items-TOTAL_FORMS'로 고정됩니다.
+    formset = PurchaseCreateFormSet(queryset=PurchaseItem.objects.none(), prefix='items') 
 
-    # 4. 화면으로 전달
     context = {
         'purchases': purchases,
         'suppliers': suppliers,
         'products_all': products_all,
         'locations_all': locations_all,
         'form': form,
-        'formset': formset  # <--- ★ 핵심: 이게 있어야 팝업에 입력칸이 보입니다.
+        'formset': formset
     }
     return render(request, 'fulfillment/purchase_list.html', context)
 
