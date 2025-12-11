@@ -1,0 +1,66 @@
+{% extends 'base.html' %}
+{% load humanize %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2>💰 급여 대장</h2>
+    
+    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addModal">
+        <i class="bi bi-plus-lg"></i> 급여 지급
+    </button>
+</div>
+
+<div class="card shadow-sm mb-4 bg-light">
+    <div class="card-body py-3">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-md-4">
+                <label class="form-label fw-bold small">지급일자 범위</label>
+                <div class="input-group">
+                    <input type="date" name="start_date" class="form-control" value="{{ request.GET.start_date }}">
+                    <span class="input-group-text">~</span>
+                    <input type="date" name="end_date" class="form-control" value="{{ request.GET.end_date }}">
+                </div>
+            </div>
+
+            <div class="col-md-3">
+                <label class="form-label fw-bold small">직원명</label>
+                <input type="text" name="emp_name" class="form-control" value="{{ request.GET.emp_name }}" placeholder="이름 검색">
+            </div>
+
+            <div class="col-md-3 d-flex gap-2">
+                <button type="submit" class="btn btn-secondary flex-fill">
+                    <i class="bi bi-search"></i> 조회
+                </button>
+                <a href="{% url 'fulfillment:payroll_list' %}" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-counterclockwise"></i>
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+<div class="card shadow-sm mt-3">
+    <table class="table table-hover align-middle mb-0" style="font-size: 0.9rem;">
+        <thead class="table-light">
+            <tr><th>귀속월</th><th>직원</th><th class="text-end">기본급</th><th class="text-end">성과급</th><th class="text-end">수당(년/월차)</th><th class="text-end text-danger">차감액</th><th class="text-end table-primary">실수령액</th><th class="text-center">관리</th></tr>
+        </thead>
+        <tbody>
+            {% for pay in payrolls %}
+            <tr>
+                <td>{{ pay.month_label }}<br><small class="text-muted">{{ pay.payment_date|date:"m-d" }}</small></td>
+                <td class="fw-bold">{{ pay.employee.name }}</td>
+                <td class="text-end">{{ pay.base_pay|intcomma }}</td>
+                <td class="text-end">{{ pay.bonus|intcomma }}</td>
+                <td class="text-end">{{ pay.leave_pay|intcomma }}</td>
+                <td class="text-end text-danger">- {{ pay.deduction|intcomma }}</td>
+                <td class="text-end fw-bold text-primary" style="font-size: 1.1em;">{{ pay.total_amount|intcomma }} đ</td>
+                <td class="text-center">
+                    <a href="{% url 'fulfillment:payroll_update' pay.id %}" class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil-square"></i></a>
+                    <a href="{% url 'fulfillment:payroll_delete' pay.id %}" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+<div class="modal fade" id="addModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered modal-lg"><div class="modal-content"><div class="modal-header bg-primary text-white"><h5 class="modal-title">💰 급여 지급 등록</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div><form method="post" action="{% url 'fulfillment:payroll_create' %}">{% csrf_token %}<div class="modal-body"><div class="row g-3"><div class="col-6"><label class="form-label fw-bold">귀속월</label>{{ form.month_label }}</div><div class="col-6"><label class="form-label fw-bold">지급일</label>{{ form.payment_date }}</div><div class="col-12"><label class="form-label fw-bold">대상 직원</label>{{ form.employee }}</div><div class="col-6"><label class="form-label fw-bold">기본급</label>{{ form.base_pay }}</div><div class="col-6"><label class="form-label fw-bold">성과급</label>{{ form.bonus }}</div><div class="col-6"><label class="form-label fw-bold">연/월차 수당</label>{{ form.leave_pay }}</div><div class="col-6"><label class="form-label fw-bold text-danger">차감액 (세금 등)</label>{{ form.deduction }}</div></div></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">취소</button><button type="submit" class="btn btn-primary">지급 확정</button></div></form></div></div></div>
+{% endblock %}

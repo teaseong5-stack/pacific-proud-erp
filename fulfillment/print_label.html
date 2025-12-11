@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>재고 라벨 출력</title>
+    <style>
+        body { margin: 0; padding: 20px; font-family: sans-serif; text-align: center; }
+        .label-container {
+            border: 3px dashed #333;
+            width: 400px;
+            padding: 20px;
+            margin: 0 auto;
+            border-radius: 10px;
+        }
+        .product-name { font-size: 22px; font-weight: bold; margin-bottom: 10px; word-break: keep-all; }
+        .meta-info { font-size: 14px; margin-bottom: 15px; line-height: 1.5; text-align: left; padding-left: 20px;}
+        .barcode-img { width: 100%; max-width: 350px; }
+        .btn-print { margin-top: 20px; padding: 10px 20px; background: #0d6efd; color: white; border: none; cursor: pointer; font-size: 16px; border-radius: 5px; }
+        
+        @media print {
+            .btn-print, .home-link { display: none; }
+            .label-container { border: none; }
+        }
+    </style>
+</head>
+<body>
+    <div class="label-container">
+        <div class="product-name">{{ inventory.product.name }}</div>
+        <div class="meta-info">
+            🔹 SKU: {{ inventory.product.sku }}<br>
+            🔹 유통기한: {{ inventory.expiry_date }}<br>
+            🔹 보관: {{ inventory.location.zone.get_storage_type_display }}<br>
+            🔹 위치: {{ inventory.location.code }}
+        </div>
+        
+        <img src="{{ barcode_img }}" class="barcode-img" alt="Barcode">
+        
+        <div style="font-size: 12px; margin-top: 5px;">
+            BATCH: {{ inventory.batch_number }}
+        </div>
+    </div>
+
+    <button class="btn-print" onclick="window.print()">🖨️ 라벨 출력하기</button>
+    <br><br>
+    <a href="{% url 'fulfillment:dashboard' %}" class="home-link">🏠 대시보드로 돌아가기</a>
+</body>
+</html>

@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>Invoice - {{ order.id }}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&family=Noto+Sans:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        /* 1. 기본 설정 */
+        body {
+            background-color: #525659;
+            font-family: 'Noto Sans KR', 'Noto Sans', sans-serif; /* 다국어 지원 폰트 */
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px; /* 페이지 간 간격 */
+        }
+
+        /* 2. A4 용지 규격 */
+        .page {
+            background-color: white;
+            width: 210mm;
+            min-height: 297mm;
+            padding: 15mm;
+            box-sizing: border-box;
+            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+            position: relative;
+        }
+
+        /* 3. 공통 스타일 */
+        .header-title {
+            text-align: center; font-size: 28px; font-weight: bold; letter-spacing: 2px;
+            margin-bottom: 5px; text-decoration: underline; text-underline-offset: 5px;
+        }
+        .header-info { text-align: center; font-size: 12px; color: #555; margin-bottom: 30px; }
+        
+        /* 테이블 스타일 */
+        .info-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; table-layout: fixed; }
+        .info-table td { border: 2px solid #333; padding: 0; vertical-align: top; }
+        .info-box { padding: 10px; font-size: 13px; line-height: 1.6; }
+        .info-box h4 { margin: 0 0 10px 0; border-bottom: 1px solid #ccc; padding-bottom: 5px; text-align: center; background-color: #f8f9fa; }
+        .info-row { display: flex; margin-bottom: 4px; }
+        .info-label { width: 90px; font-weight: bold; color: #444; flex-shrink: 0; }
+        .info-val { flex-grow: 1; word-break: break-word; }
+
+        .items-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 12px; }
+        .items-table th, .items-table td { border: 1px solid #888; padding: 8px 5px; }
+        .items-table th { background-color: #e9ecef; text-align: center; font-weight: bold; border-bottom: 2px solid #333; }
+        
+        .text-center { text-align: center; }
+        .text-right { text-align: right; }
+        .text-left { text-align: left; padding-left: 5px; }
+        .amount-col { font-weight: bold; }
+
+        /* 하단 합계 */
+        .footer-section { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 20px; border-top: 2px solid #333; padding-top: 15px; }
+        .bank-info { font-size: 13px; color: #555; background-color: #f8f9fa; padding: 10px; border-radius: 5px; border: 1px dashed #aaa; }
+        .total-value { font-size: 24px; font-weight: bold; color: #d63031; }
+
+        /* 버튼 */
+        .action-buttons { position: fixed; top: 20px; right: 20px; display: flex; flex-direction: column; gap: 10px; }
+        .btn { padding: 10px 20px; color: white; text-decoration: none; border-radius: 5px; font-size: 14px; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.3); text-align: center; cursor: pointer; border: none; }
+        .btn-print { background-color: #0d6efd; }
+        .btn-back { background-color: #6c757d; }
+
+        /* 인쇄 설정 (핵심!) */
+        @media print {
+            body { background-color: white; padding: 0; gap: 0; }
+            .page { box-shadow: none; margin: 0; width: 100%; height: auto; page-break-after: always; }
+            .page:last-child { page-break-after: auto; } /* 마지막 페이지는 공백 없음 */
+            .action-buttons { display: none; }
+        }
+    </style>
+</head>
+<body>
+    {% load humanize %}
+
+    <div class="action-buttons">
+        <button onclick="window.print()" class="btn btn-print">🖨️ 인쇄 (Print)</button>
+        
+        <button onclick="shareInvoice()" class="btn" style="background-color: #25d366;">
+            📱 카톡/Zalo 공유
+        </button>
+
+        <a href="{% url 'fulfillment:order_list' %}" class="btn btn-back">⬅ 목록 (Back)</a>
+    </div>
+
+    <div class="page">
+        <div class="header-title">거 래 명 세 서</div>
+        <div class="header-info">
+            일련번호 : {{ order.order_date|date:"Ymd" }}-{{ order.id }} &nbsp;|&nbsp;
+            거래일자 : {{ order.order_date|date:"Y년 m월 d일" }}
+        </div>
+
+        <table class="info-table">
+            <tr>
+                <td width="50%">
+                    <div class="info-box">
+                        <h4>공급받는자 (Buyer)</h4>
+                        <div class="info-row"><span class="info-label">상 호</span><span class="info-val">{{ order.client.name|default:"(미지정)" }}</span></div>
+                        <div class="info-row"><span class="info-label">사업자번호</span><span class="info-val">{{ order.client.biz_number|default:"-" }}</span></div>
+                        <div class="info-row"><span class="info-label">대 표 자</span><span class="info-val">{{ order.client.owner_name|default:"-" }}</span></div>
+                        <div class="info-row"><span class="info-label">전화번호</span><span class="info-val">{{ order.client.phone|default:"-" }}</span></div>
+                        <div class="info-row"><span class="info-label">주 소</span><span class="info-val">{{ order.client.address|default:"-" }}</span></div>
+                    </div>
+                </td>
+                <td width="50%">
+                    <div class="info-box">
+                        <h4>공급자 (Supplier)</h4>
+                        <div class="info-row"><span class="info-label">상 호</span><span class="info-val">{{ company.name }}</span></div>
+                        <div class="info-row"><span class="info-label">사업자번호</span><span class="info-val">{{ company.biz_number }}</span></div>
+                        <div class="info-row"><span class="info-label">대 표 자</span><span class="info-val">{{ company.ceo_name }} (인)</span></div>
+                        <div class="info-row"><span class="info-label">전화번호</span><span class="info-val">{{ company.phone }}</span></div>
+                        <div class="info-row"><span class="info-label">주 소</span><span class="info-val">{{ company.address }}</span></div>
+                    </div>
+                </td>
+            </tr>
+        </table>
+
+        <table class="items-table">
+            <thead>
+                <tr>
+                    <th width="5%">No</th>
+                    <th width="35%">품목명</th>
+                    <th width="10%">주문수량</th>
+                    <th width="10%">실측(kg)</th>
+                    <th width="10%">단위</th>
+                    <th width="15%">단가</th>
+                    <th width="15%">공급가액</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in items %}
+                <tr>
+                    <td class="text-center">{{ forloop.counter }}</td>
+                    <td class="text-left">{{ item.product.name }}</td>
+                    <td class="text-center">{{ item.quantity }}</td>
+                    <td class="text-center">{{ item.supplied_weight|default:"-" }}</td>
+                    <td class="text-center">{{ item.product.unit }}</td>
+                    <td class="text-right">{{ item.product.price|intcomma }}</td>
+                    <td class="text-right amount-col">{{ item.final_amount|intcomma }}</td>
+                </tr>
+                {% endfor %}
+                {% for i in "123" %} <tr style="height: 30px;"><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr> {% endfor %}
+            </tbody>
+        </table>
+
+        <div class="footer-section">
+            <div class="bank-info">
+                <strong>※ 입금 계좌 안내</strong><br>
+                {{ company.bank_account|default:"-" }}
+            </div>
+            
+            <div class="total-amount" style="text-align: right; line-height: 1.8;">
+                <div>
+                    <span style="font-size: 14px; color: #555;">금번 청구액 :</span>
+                    <span style="font-size: 16px; font-weight: bold; width: 120px; display: inline-block;">{{ order.total_revenue|intcomma }} đ</span>
+                </div>
+                <div>
+                    <span style="font-size: 14px; color: #555;">전 미수금 :</span>
+                    <span style="font-size: 16px; font-weight: bold; width: 120px; display: inline-block;">{{ previous_balance|intcomma }} đ</span>
+                </div>
+                <div style="margin-top: 5px; border-top: 1px solid #aaa; padding-top: 5px;">
+                    <span style="font-size: 16px; font-weight: bold; color: #333;">총 미수금 :</span>
+                    <span style="font-size: 24px; font-weight: bold; color: #d63031; width: 120px; display: inline-block;">{{ total_balance|intcomma }} đ</span>
+                </div>
+            </div>
+        </div>
+        <div style="margin-top: 30px; text-align: center; font-size: 14px;">위와 같이 정히 청구(영수)합니다.</div>
+    </div>
+
+    <div class="page">
+        <div class="header-title">HÓA ĐƠN BÁN HÀNG</div>
+        <div class="header-info">
+            Số (No) : {{ order.order_date|date:"Ymd" }}-{{ order.id }} &nbsp;|&nbsp;
+            Ngày (Date) : {{ order.order_date|date:"d/m/Y" }}
+        </div>
+
+        <table class="info-table">
+            <tr>
+                <td width="50%">
+                    <div class="info-box">
+                        <h4>Người mua (Buyer)</h4>
+                        <div class="info-row"><span class="info-label">Tên</span><span class="info-val">{{ order.client.name|default:"-" }}</span></div>
+                        <div class="info-row"><span class="info-label">Mã số thuế</span><span class="info-val">{{ order.client.biz_number|default:"-" }}</span></div>
+                        <div class="info-row"><span class="info-label">Đại diện</span><span class="info-val">{{ order.client.owner_name|default:"-" }}</span></div>
+                        <div class="info-row"><span class="info-label">Điện thoại</span><span class="info-val">{{ order.client.phone|default:"-" }}</span></div>
+                        <div class="info-row"><span class="info-label">Địa chỉ</span><span class="info-val">{{ order.client.address|default:"-" }}</span></div>
+                    </div>
+                </td>
+                <td width="50%">
+                    <div class="info-box">
+                        <h4>Nhà cung cấp (Supplier)</h4>
+                        <div class="info-row"><span class="info-label">Tên</span><span class="info-val">{{ company.name }}</span></div>
+                        <div class="info-row"><span class="info-label">Mã số thuế</span><span class="info-val">{{ company.biz_number }}</span></div>
+                        <div class="info-row"><span class="info-label">Đại diện</span><span class="info-val">{{ company.ceo_name }}</span></div>
+                        <div class="info-row"><span class="info-label">Điện thoại</span><span class="info-val">{{ company.phone }}</span></div>
+                        <div class="info-row"><span class="info-label">Địa chỉ</span><span class="info-val">{{ company.address }}</span></div>
+                    </div>
+                </td>
+            </tr>
+        </table>
+
+        <table class="items-table">
+            <thead>
+                <tr>
+                    <th width="5%">No</th>
+                    <th width="35%">Tên hàng (Item)</th>
+                    <th width="10%">Số lượng<br>(Qty)</th>
+                    <th width="10%">Thực tế<br>(Kg)</th>
+                    <th width="10%">Đơn vị<br>(Unit)</th>
+                    <th width="15%">Đơn giá<br>(Price)</th>
+                    <th width="15%">Thành tiền<br>(Amount)</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in items %}
+                <tr>
+                    <td class="text-center">{{ forloop.counter }}</td>
+                    <td class="text-left">{{ item.product.name }}</td>
+                    <td class="text-center">{{ item.quantity }}</td>
+                    <td class="text-center">{{ item.supplied_weight|default:"-" }}</td>
+                    <td class="text-center">{{ item.product.unit }}</td>
+                    <td class="text-right">{{ item.product.price|intcomma }}</td>
+                    <td class="text-right amount-col">{{ item.final_amount|intcomma }}</td>
+                </tr>
+                {% endfor %}
+                {% for i in "123" %} <tr style="height: 30px;"><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr> {% endfor %}
+            </tbody>
+        </table>
+
+        <div class="footer-section">
+            <div class="bank-info">
+                <strong>※ Thông tin tài khoản (Bank Info)</strong><br>
+                {{ company.bank_account|default:"-" }}
+            </div>
+            
+            <div class="total-amount" style="text-align: right; line-height: 1.8;">
+                <div>
+                    <span style="font-size: 14px; color: #555;">Tiền hàng (Amount) :</span>
+                    <span style="font-size: 16px; font-weight: bold; width: 120px; display: inline-block;">{{ order.total_revenue|intcomma }} đ</span>
+                </div>
+                <div>
+                    <span style="font-size: 14px; color: #555;">Nợ cũ (Previous) :</span>
+                    <span style="font-size: 16px; font-weight: bold; width: 120px; display: inline-block;">{{ previous_balance|intcomma }} đ</span>
+                </div>
+                <div style="margin-top: 5px; border-top: 1px solid #aaa; padding-top: 5px;">
+                    <span style="font-size: 16px; font-weight: bold; color: #333;">Tổng cộng (Total) :</span>
+                    <span style="font-size: 24px; font-weight: bold; color: #d63031; width: 120px; display: inline-block;">{{ total_balance|intcomma }} đ</span>
+                </div>
+            </div>
+        </div>
+        
+        <div style="display: flex; justify-content: space-around; margin-top: 50px; text-align: center;">
+            <div>
+                <strong>Người mua hàng</strong><br>
+                <small>(Buyer)</small>
+                <br><br><br><br>
+                __________________
+            </div>
+            <div>
+                <strong>Người bán hàng</strong><br>
+                <small>(Seller)</small>
+                <br><br><br><br>
+                __________________
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        function shareInvoice() {
+            const url = window.location.href;
+            const title = "Hóa đơn bán hàng - PACIFIC PROUD";
+            if (navigator.share) {
+                navigator.share({ title: title, text: 'Hóa đơn (Invoice)', url: url }).catch(console.error);
+            } else {
+                navigator.clipboard.writeText(url).then(() => { alert("Link copied!"); });
+            }
+        }
+    </script>
+</body>
+</html>

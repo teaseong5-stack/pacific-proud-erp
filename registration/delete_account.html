@@ -1,0 +1,20 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container mt-5 d-flex justify-content-center">
+    <div class="card border-danger shadow" style="max-width: 500px;">
+        <div class="card-header bg-danger text-white fw-bold">⚠ 회원 탈퇴</div>
+        <div class="card-body text-center p-5">
+            <h4 class="mb-3">정말 탈퇴하시겠습니까?</h4>
+            <p class="text-muted mb-4">
+                계정을 삭제하면 복구할 수 없습니다.<br>
+                (작성한 데이터는 보존됩니다)
+            </p>
+            <form method="post">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-danger w-100 mb-2">네, 탈퇴합니다</button>
+                <a href="{% url 'fulfillment:dashboard' %}" class="btn btn-secondary w-100">취소</a>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
