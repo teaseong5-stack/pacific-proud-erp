@@ -263,20 +263,43 @@ def inventory_delete(request, pk):
 
 @login_required
 def purchase_list(request):
+    """발주 현황 리스트 + 신규 발주 등록 팝업 처리"""
+    
+    # 1. 기존 리스트 조회 로직 (그대로 유지)
     purchases = Purchase.objects.select_related('supplier').order_by('-purchase_date')
-    start_date = request.GET.get('start_date'); end_date = request.GET.get('end_date')
-    supplier_id = request.GET.get('supplier'); status = request.GET.get('status')
+    
+    start_date = request.GET.get('start_date')
+    end_date = request.GET.get('end_date')
+    supplier_id = request.GET.get('supplier')
+    status = request.GET.get('status')
+
     if start_date: purchases = purchases.filter(purchase_date__gte=start_date)
     if end_date: purchases = purchases.filter(purchase_date__lte=end_date)
     if supplier_id: purchases = purchases.filter(supplier_id=supplier_id)
     if status: purchases = purchases.filter(status=status)
+
+    # 2. 팝업창에 필요한 데이터 준비
     suppliers = Partner.objects.filter(partner_type__in=['SUPPLIER', 'BOTH'])
-    locations_all = Location.objects.filter(is_active=True)
     products_all = Product.objects.all()
+    locations_all = Location.objects.filter(is_active=True)
+    
+    # 3. ★ 신규 등록용 폼 & 폼셋 생성 (이 부분이 빠져있었습니다!)
     form = PurchaseForm(initial={'purchase_date': timezone.now().date()})
-    return render(request, 'fulfillment/purchase_list.html', {
-        'purchases': purchases, 'form': form, 'products_all': products_all, 'locations_all': locations_all, 'suppliers': suppliers
-    })
+    
+    # 여기서 queryset=...none()을 해야 빈 칸들만 나옵니다. (안 하면 기존 DB 내용이 다 나옴)
+    formset = PurchaseCreateFormSet(queryset=PurchaseItem.objects.none())
+
+    # 4. 화면으로 전달
+    context = {
+        'purchases': purchases,
+        'suppliers': suppliers,
+        'products_all': products_all,
+        'locations_all': locations_all,
+        'form': form,
+        'formset': formset  # <--- ★ 핵심: 이게 있어야 팝업에 입력칸이 보입니다.
+    }
+    return render(request, 'fulfillment/purchase_list.html', context)
+
 @login_required
 def purchase_create(request):
     if request.method == 'POST':
