@@ -2,259 +2,140 @@
 {% load humanize %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-3">
-    <h2>🚚 주문 및 출고 관리</h2>
-    
-    <div>
-        <a href="{% url 'fulfillment:export_order' %}?{{ request.GET.urlencode }}" class="btn btn-success me-2">
-            <i class="bi bi-file-earmark-excel"></i> 엑셀 다운로드
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="h4 text-gray-800"><i class="bi bi-truck me-2"></i>주문/출고 관리</h2>
+        <a href="{% url 'fulfillment:order_create' %}" class="btn btn-primary">
+            <i class="bi bi-plus-lg me-1"></i> 신규 주문 등록
         </a>
-        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addOrderModal">
-            <i class="bi bi-plus-lg"></i> 신규 주문 접수
-        </button>
     </div>
-</div>
 
-<div class="card shadow-sm mb-4 bg-light">
-    <div class="card-body py-3">
-        <form method="get" class="row g-2 align-items-end">
-            <div class="col-md-3">
-                <label class="form-label fw-bold small">주문 기간</label>
-                <div class="input-group">
-                    <input type="date" name="start_date" class="form-control" value="{{ request.GET.start_date }}">
-                    <span class="input-group-text">~</span>
-                    <input type="date" name="end_date" class="form-control" value="{{ request.GET.end_date }}">
-                </div>
-            </div>
-
-            <div class="col-md-3">
-                <label class="form-label fw-bold small">납품처 (고객)</label>
-                <select name="client" class="form-select search-select">
-                    <option value="">전체 고객</option>
-                    {% for cli in clients %}
-                        <option value="{{ cli.id }}" {% if request.GET.client == cli.id|stringformat:"s" %}selected{% endif %}>
-                            {{ cli.name }}
-                        </option>
-                    {% endfor %}
-                </select>
-            </div>
-
-            <div class="col-md-2">
-                <label class="form-label fw-bold small">진행 상태</label>
-                <select name="status" class="form-select">
-                    <option value="">전체 상태</option>
-                    <option value="PENDING" {% if request.GET.status == 'PENDING' %}selected{% endif %}>접수대기</option>
-                    <option value="ALLOCATED" {% if request.GET.status == 'ALLOCATED' %}selected{% endif %}>피킹중</option>
-                    <option value="SHIPPED" {% if request.GET.status == 'SHIPPED' %}selected{% endif %}>출고완료</option>
-                </select>
-            </div>
-
-            <div class="col-md-4 d-flex gap-2">
-                <button type="submit" class="btn btn-secondary flex-fill">
-                    <i class="bi bi-search"></i> 조회
-                </button>
-                <a href="{% url 'fulfillment:order_list' %}" class="btn btn-outline-secondary">
-                    <i class="bi bi-arrow-counterclockwise"></i> 초기화
-                </a>
-            </div>
-        </form>
-    </div>
-</div>
-
-<div class="card shadow-sm">
-    <div class="card-body p-0">
-        <table class="table table-hover align-middle mb-0">
-            <thead class="table-light">
-                <tr>
-                    <th>주문번호</th>
-                    <th>납품처 (고객)</th>
-                    <th>주문일자</th>
-                    <th>총 매출액</th>
-                    <th>상태</th>
-                    <th class="text-center">관리 (프로세스)</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for order in orders %}
-                <tr>
-                    <td>#{{ order.id }}</td>
-                    <td class="fw-bold">{{ order.client.name }}</td>
-                    <td>{{ order.order_date|date:"Y-m-d" }}</td>
-                    <td class="fw-bold">{{ order.total_revenue|intcomma }} đ</td>
-                    <td>
-                        {% if order.status == 'SHIPPED' %} <span class="badge bg-success">출고완료</span>
-                        {% elif order.status == 'ALLOCATED' %} <span class="badge bg-info text-dark">피킹중</span>
-                        {% else %} <span class="badge bg-warning text-dark">접수대기</span> {% endif %}
-                    </td>
-                    <td class="text-center" style="white-space: nowrap;">
-                        {% if order.status == 'PENDING' %}
-                        <a href="{% url 'fulfillment:order_allocate' order.id %}" class="btn btn-sm btn-warning me-1" title="피킹지시(재고차감)" onclick="return confirm('재고를 차감하고 피킹 지시를 내리시겠습니까?');">
-                            <i class="bi bi-lightning-charge-fill"></i>
-                        </a>
-                        {% endif %}
-
-                        {% if order.status != 'PENDING' %}
-                        <a href="{% url 'fulfillment:process_weight' order.id %}" class="btn btn-sm btn-outline-success me-1" title="중량/검수">
-                            <i class="bi bi-ui-checks"></i>
-                        </a>
-                        {% endif %}
-
-                        <a href="{% url 'fulfillment:generate_invoice' order.id %}" class="btn btn-sm btn-outline-secondary me-1" target="_blank" title="명세서">
-                            <i class="bi bi-receipt"></i>
-                        </a>
-                        <a href="{% url 'fulfillment:order_update' order.id %}" class="btn btn-sm btn-outline-primary me-1" title="수정">
-                            <i class="bi bi-pencil-square"></i>
-                        </a>
-                        <a href="{% url 'fulfillment:order_delete' order.id %}" class="btn btn-sm btn-outline-danger" title="삭제">
-                            <i class="bi bi-trash"></i>
-                        </a>
-                    </td>
-                </tr>
-                {% empty %}
-                <tr><td colspan="6" class="text-center p-4">검색된 주문 내역이 없습니다.</td></tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-</div>
-
-<div class="modal fade" id="addOrderModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-xl">
-        <div class="modal-content">
-            <div class="modal-header bg-primary text-white">
-                <h5 class="modal-title">🚚 신규 주문 등록 (통합)</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-            </div>
-            
-            <form method="post" action="{% url 'fulfillment:order_create' %}">
-                {% csrf_token %}
-                <div class="modal-body">
-                    <div class="row g-3 mb-4 bg-light p-3 rounded border">
-                        <div class="col-md-6">
-                            <label class="form-label fw-bold">납품처 (고객)</label>
-                            {{ form.client }}
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label fw-bold">상태</label>
-                            {{ form.status }}
-                        </div>
+    <div class="card shadow mb-4">
+        <div class="card-body bg-light">
+            <form method="get" class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label small fw-bold">기간 조회</label>
+                    <div class="input-group">
+                        <input type="date" name="start_date" class="form-control" value="{{ request.GET.start_date }}">
+                        <span class="input-group-text">~</span>
+                        <input type="date" name="end_date" class="form-control" value="{{ request.GET.end_date }}">
                     </div>
-
-                    <h6 class="fw-bold mb-2">📦 주문 상품 목록</h6>
-                    <table class="table table-bordered text-center align-middle">
-                        <thead class="table-light">
-                            <tr>
-                                <th style="width: 30%;">상품명 (규격)</th>
-                                <th style="width: 20%;">수량</th>
-                                <th style="width: 20%;">예상 단가</th>
-                                <th style="width: 20%;">합계</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for i in "12345" %}
-                            <tr>
-                                <td>
-                                    <select name="items-{{ forloop.counter0 }}-product" class="form-select product-select">
-                                        <option value="">-- 상품 선택 --</option>
-                                        {% for prod in products_all %}
-                                            <option value="{{ prod.id }}" data-price="{{ prod.price }}" data-unit="{{ prod.unit }}">
-                                                {{ prod.name }} ({{ prod.unit }})
-                                            </option>
-                                        {% endfor %}
-                                    </select>
-                                </td>
-                                <td>
-                                    <input type="number" name="items-{{ forloop.counter0 }}-quantity" class="form-control quantity-input" placeholder="0">
-                                </td>
-                                <td>
-                                    <input type="text" class="form-control-plaintext text-end price-display" readonly value="0">
-                                </td>
-                                <td>
-                                    <input type="text" class="form-control-plaintext text-end total-display fw-bold" readonly value="0">
-                                </td>
-                            </tr>
-                            {% endfor %}
-                            
-                            <input type="hidden" name="items-TOTAL_FORMS" value="5">
-                            <input type="hidden" name="items-INITIAL_FORMS" value="0">
-                        </tbody>
-                        <tfoot class="table-light">
-                            <tr>
-                                <td colspan="3" class="text-end fw-bold">총 합계 :</td>
-                                <td class="text-end fw-bold text-danger fs-5" id="grandTotal">0 đ</td>
-                            </tr>
-                        </tfoot>
-                    </table>
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">취소</button>
-                    <button type="submit" class="btn btn-primary">주문 완료</button>
+                <div class="col-md-3">
+                    <label class="form-label small fw-bold">납품처 (Client)</label>
+                    <select name="client" class="form-select search-select">
+                        <option value="">전체</option>
+                        {% for client in clients %}
+                        <option value="{{ client.id }}" {% if request.GET.client == client.id|stringformat:"s" %}selected{% endif %}>
+                            {{ client.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small fw-bold">상태</label>
+                    <select name="status" class="form-select">
+                        <option value="">전체</option>
+                        <option value="PENDING" {% if request.GET.status == 'PENDING' %}selected{% endif %}>주문접수</option>
+                        <option value="PREPARING" {% if request.GET.status == 'PREPARING' %}selected{% endif %}>배송준비중</option>
+                        <option value="SHIPPED" {% if request.GET.status == 'SHIPPED' %}selected{% endif %}>출고완료</option>
+                        <option value="CANCELLED" {% if request.GET.status == 'CANCELLED' %}selected{% endif %}>취소됨</option>
+                    </select>
+                </div>
+                <div class="col-md-4 d-flex align-items-end gap-2">
+                    <button type="submit" class="btn btn-secondary flex-grow-1"><i class="bi bi-search"></i> 검색</button>
+                    <a href="{% url 'fulfillment:order_list' %}" class="btn btn-outline-secondary"><i class="bi bi-arrow-counterclockwise"></i> 초기화</a>
+                    <a href="{% url 'fulfillment:export_order_excel' %}?{{ request.GET.urlencode }}" class="btn btn-success"><i class="bi bi-file-earmark-excel"></i> 엑셀</a>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <div class="card shadow">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0" style="min-width: 1000px;">
+                    <thead class="bg-light text-secondary">
+                        <tr>
+                            <th class="ps-4">주문번호</th>
+                            <th>주문일시</th>
+                            <th>납품처</th>
+                            <th>품목수</th>
+                            <th>매출액 (Revenue)</th>
+                            <th>상태</th>
+                            <th>관리</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for order in orders %}
+                        <tr>
+                            <td class="ps-4 fw-bold">#{{ order.id }}</td>
+                            <td>{{ order.order_date|date:"Y-m-d H:i" }}</td>
+                            <td>
+                                <a href="{% url 'fulfillment:partner_detail' order.client.id %}" class="text-decoration-none fw-bold">
+                                    {{ order.client.name }}
+                                </a>
+                            </td>
+                            <td>{{ order.items.count }} 종</td>
+                            <td class="text-end pe-4 text-primary fw-bold">{{ order.total_revenue|intcomma }} đ</td>
+                            <td>
+                                {% if order.status == 'PENDING' %}
+                                <span class="badge bg-secondary">주문접수</span>
+                                {% elif order.status == 'PREPARING' %}
+                                <span class="badge bg-warning text-dark">준비중</span>
+                                {% elif order.status == 'SHIPPED' %}
+                                <span class="badge bg-success">출고완료</span>
+                                {% else %}
+                                <span class="badge bg-danger">취소</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="btn-group">
+                                    <a href="{% url 'fulfillment:order_update' order.id %}" class="btn btn-sm btn-outline-primary">
+                                        <i class="bi bi-pencil-square"></i> 수정
+                                    </a>
+                                    {% if order.status == 'PENDING' %}
+                                    <a href="{% url 'fulfillment:order_allocate' order.id %}" class="btn btn-sm btn-outline-success" onclick="return confirm('피킹 지시서를 생성하시겠습니까? (재고 할당)');">
+                                        <i class="bi bi-box-seam"></i> 피킹지시
+                                    </a>
+                                    {% elif order.status == 'PREPARING' %}
+                                    <a href="{% url 'fulfillment:process_weight' order.id %}" class="btn btn-sm btn-outline-warning text-dark">
+                                        <i class="bi bi-basket"></i> 계량/출고
+                                    </a>
+                                    {% elif order.status == 'SHIPPED' %}
+                                    <a href="{% url 'fulfillment:generate_invoice' order.id %}" class="btn btn-sm btn-outline-info" target="_blank">
+                                        <i class="bi bi-receipt"></i> 명세서
+                                    </a>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="7" class="text-center py-5 text-muted">등록된 주문 내역이 없습니다.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
 </div>
 
 <script>
     $(document).ready(function() {
-        // 1. 모달이 열릴 때 Select2 초기화
-        $('#addOrderModal').on('shown.bs.modal', function () {
-            $('.product-select').select2({
-                theme: 'bootstrap-5',
-                dropdownParent: $('#addOrderModal'),
-                placeholder: '상품명 또는 SKU 검색',
-                allowClear: true,
-                width: '100%'
-            });
-        });
-
-        // 2. 상품 선택 시 단가/합계 계산
-        $(document).on('select2:select', '.product-select', function(e) {
-            const select = this;
-            const row = select.closest('tr');
-            const quantityInput = row.querySelector('.quantity-input');
-            const priceDisplay = row.querySelector('.price-display');
-            const totalDisplay = row.querySelector('.total-display');
-
-            const selectedOption = select.options[select.selectedIndex];
-            const price = selectedOption.dataset.price || 0;
-            
-            priceDisplay.value = Number(price).toLocaleString() + ' đ';
-            
-            const quantity = quantityInput.value || 0;
-            const total = price * quantity;
-            totalDisplay.value = Number(total).toLocaleString() + ' đ';
-            totalDisplay.dataset.rawValue = total;
-            
-            calculateGrandTotal();
-        });
-
-        // 3. 수량 입력 시 합계 계산
-        $(document).on('input', '.quantity-input', function() {
-            const row = this.closest('tr');
-            const select = row.querySelector('.product-select');
-            const totalDisplay = row.querySelector('.total-display');
-            
-            let price = 0;
-            if (select.selectedIndex >= 0) {
-                 price = select.options[select.selectedIndex].dataset.price || 0;
-            }
-            const quantity = this.value || 0;
-            const total = price * quantity;
-
-            totalDisplay.value = Number(total).toLocaleString() + ' đ';
-            totalDisplay.dataset.rawValue = total;
-            
-            calculateGrandTotal();
+        $('.search-select').select2({
+            theme: 'bootstrap-5',
+            width: '100%',
+            placeholder: '검색 또는 선택',
+            allowClear: true
         });
     });
-
-    function calculateGrandTotal() {
-        let grandTotal = 0;
-        document.querySelectorAll('.total-display').forEach(input => {
-            grandTotal += Number(input.dataset.rawValue || 0);
-        });
-        document.getElementById('grandTotal').innerText = grandTotal.toLocaleString() + ' đ';
-    }
 </script>
+
+<style>
+    .table td, .table th { white-space: nowrap; }
+    .badge { font-weight: 500; font-size: 0.85em; }
+</style>
+
 {% endblock %}
