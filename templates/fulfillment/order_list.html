@@ -164,8 +164,11 @@
                                 <table class="table table-bordered mb-0 text-center" id="items-table">
                                     <thead class="bg-light">
                                         <tr>
-                                            <th style="width: 45%;">상품명 <span class="text-danger">*</span></th>
-                                            <th style="width: 30%;">주문 수량 <span class="text-danger">*</span></th>
+                                            <th style="width: 30%;">상품명 <span class="text-danger">*</span></th>
+                                            <th style="width: 15%;">상품코드</th>
+                                            <th style="width: 15%;">단가 (Price)</th>
+                                            <th style="width: 10%;">수량 <span class="text-danger">*</span></th>
+                                            <th style="width: 20%;">금액 (Total)</th>
                                             <th style="width: 10%;">삭제</th>
                                         </tr>
                                     </thead>
@@ -175,8 +178,21 @@
                                         {% for form in formset %}
                                             <tr class="item-row">
                                                 {{ form.id }}
-                                                <td class="text-start px-2">{{ form.product }}</td>
-                                                <td class="px-2">{{ form.quantity }}</td>
+                                                <td class="text-start px-2">
+                                                    {{ form.product }}
+                                                </td>
+                                                <td class="px-2">
+                                                    <input type="text" class="form-control form-control-sm bg-light text-center item-sku" readonly placeholder="-">
+                                                </td>
+                                                <td class="px-2">
+                                                    <input type="text" class="form-control form-control-sm bg-light text-end item-price" readonly placeholder="0">
+                                                </td>
+                                                <td class="px-2">
+                                                    {{ form.quantity }}
+                                                </td>
+                                                <td class="px-2">
+                                                    <input type="text" class="form-control form-control-sm bg-light text-end fw-bold item-total" readonly placeholder="0">
+                                                </td>
                                                 <td>
                                                     <div class="form-check d-flex justify-content-center">
                                                         {{ form.DELETE }}
@@ -206,8 +222,21 @@
     <tbody id="empty-form-row">
         <tr class="item-row">
             {{ formset.empty_form.id }}
-            <td class="text-start px-2">{{ formset.empty_form.product }}</td>
-            <td class="px-2">{{ formset.empty_form.quantity }}</td>
+            <td class="text-start px-2">
+                {{ formset.empty_form.product }}
+            </td>
+            <td class="px-2">
+                <input type="text" class="form-control form-control-sm bg-light text-center item-sku" readonly placeholder="-">
+            </td>
+            <td class="px-2">
+                <input type="text" class="form-control form-control-sm bg-light text-end item-price" readonly placeholder="0">
+            </td>
+            <td class="px-2">
+                {{ formset.empty_form.quantity }}
+            </td>
+            <td class="px-2">
+                <input type="text" class="form-control form-control-sm bg-light text-end fw-bold item-total" readonly placeholder="0">
+            </td>
             <td>
                 <div class="form-check d-flex justify-content-center">
                     {{ formset.empty_form.DELETE }}
@@ -218,8 +247,18 @@
 </table>
 
 <script>
+    // ★ [핵심] 모든 상품의 정보(SKU, 가격)를 자바스크립트 객체로 미리 만들어둡니다.
+    const productData = {
+        {% for p in products_all %}
+        "{{ p.id }}": {
+            "sku": "{{ p.sku }}",
+            "price": {{ p.price|default:0 }} 
+        },
+        {% endfor %}
+    };
+
     document.addEventListener('DOMContentLoaded', function() {
-        // 1. Select2 초기화 (모달 및 검색필터)
+        // 1. Select2 초기화
         $('.search-select').select2({
             theme: 'bootstrap-5',
             width: '100%',
@@ -241,7 +280,7 @@
         const formContainer = document.getElementById('formset-container');
         const emptyRowHtml = document.getElementById('empty-form-row').innerHTML;
 
-        // 초기 1줄 자동 추가
+        // 초기 1줄 추가
         if (totalForms && parseInt(totalForms.value) === 0) {
              addItem();
         }
@@ -259,14 +298,60 @@
             formContainer.insertAdjacentHTML('beforeend', newRowHtml);
             totalForms.value = parseInt(formIdx) + 1;
 
-            // 추가된 행 Select2 적용
             let newRow = formContainer.lastElementChild;
+            
+            // Select2 적용
             $(newRow).find('select').select2({
                 theme: 'bootstrap-5',
                 dropdownParent: $('#createOrderModal'),
                 width: '100%'
             });
+
+            // 이벤트 리스너 연결 (상품 선택 시 정보 불러오기)
+            bindRowEvents(newRow);
         }
+
+        // 3. [핵심] 행별 이벤트 바인딩 (계산 로직)
+        function bindRowEvents(row) {
+            const productSelect = $(row).find('select[name$="-product"]'); // Select2는 jQuery로 접근
+            const quantityInput = row.querySelector('input[name$="-quantity"]');
+            
+            const skuField = row.querySelector('.item-sku');
+            const priceField = row.querySelector('.item-price');
+            const totalField = row.querySelector('.item-total');
+
+            // (1) 상품 변경 시 -> SKU, 단가 자동 입력
+            productSelect.on('change', function() {
+                const pid = $(this).val();
+                if (pid && productData[pid]) {
+                    const data = productData[pid];
+                    skuField.value = data.sku;
+                    priceField.value = new Intl.NumberFormat().format(data.price); // 콤마 포맷
+                    priceField.dataset.rawPrice = data.price; // 계산용 원본 값 저장
+                    calculateTotal();
+                } else {
+                    skuField.value = '';
+                    priceField.value = '';
+                    priceField.dataset.rawPrice = 0;
+                    calculateTotal();
+                }
+            });
+
+            // (2) 수량 변경 시 -> 합계 재계산
+            quantityInput.addEventListener('input', calculateTotal);
+
+            function calculateTotal() {
+                const price = parseFloat(priceField.dataset.rawPrice) || 0;
+                const qty = parseFloat(quantityInput.value) || 0;
+                const total = price * qty;
+                totalField.value = new Intl.NumberFormat().format(total); // 콤마 포맷
+            }
+        }
+        
+        // 기존 행에도 이벤트 연결 (수정 모드 대비)
+        document.querySelectorAll('.item-row').forEach(row => {
+            bindRowEvents(row);
+        });
     });
 </script>
 
@@ -274,8 +359,15 @@
     .table .form-control, .table .form-select { font-size: 0.9rem; padding: 0.4rem; }
     .select2-container .select2-selection--single { height: 36px !important; }
     .select2-container--bootstrap-5 .select2-selection--single .select2-selection__rendered { line-height: 34px; }
-    .table td, .table th { white-space: nowrap; }
-    .badge { font-weight: 500; font-size: 0.85em; }
+    .table td, .table th { white-space: nowrap; vertical-align: middle; }
+    
+    /* 금액 입력칸 스타일 */
+    .item-price, .item-total { 
+        border: none; 
+        background-color: transparent !important; 
+        font-family: monospace;
+        font-size: 1rem;
+    }
 </style>
 
 {% endblock %}
