@@ -366,28 +366,45 @@ def order_update(request, pk):
     if request.method == 'POST':
         form = OrderForm(request.POST, instance=order)
         formset = OrderCreateFormSet(request.POST, instance=order)
+        
         if form.is_valid() and formset.is_valid():
-            order = form.save()
-            items = formset.save(commit=False)
+            order = form.save() # 1. 주문 기본 정보 저장
             
-            for obj in formset.deleted_objects: obj.delete()
+            # 2. 변경되거나 추가된 품목들 먼저 저장
+            # (여기서 반환되는 items는 '변경된' 항목들뿐입니다. 변경 안 된 건 안 들어있음)
+            updated_items = formset.save(commit=False)
+            for item in updated_items:
+                item.order = order
+                # 수정 시점의 가격으로 업데이트
+                item.cost_price = item.product.purchase_price 
+                item.final_amount = item.quantity * item.product.price
+                item.save()
+            
+            # 3. 삭제된 품목 처리
+            for obj in formset.deleted_objects:
+                obj.delete()
+            
+            # 4. ★ [핵심 수정] 합계 재계산 로직 변경
+            # 방금 저장한 것뿐만 아니라, 기존에 있던(수정 안 한) 품목까지 
+            # '모두' 불러와서 총액을 다시 계산해야 합니다.
+            
+            # DB에서 현재 주문에 속한 모든 아이템을 다시 조회
+            all_items = order.items.all() 
             
             total_rev = 0
             total_cost = 0
             
-            for item in items:
-                item.order = order
+            for item in all_items:
+                # 혹시라도 계산이 안 된 항목이 있다면 방어적으로 계산 (데이터 무결성 보장)
+                if item.final_amount == 0 and item.quantity > 0:
+                     item.final_amount = item.quantity * item.product.price
+                     item.cost_price = item.product.purchase_price # 원가도 없으면 채워넣기
+                     item.save()
                 
-                # ★ 수정 시점의 매입가로 다시 업데이트 할지, 유지할지 결정해야 합니다.
-                # 보통 수정 시점에는 '현재 가격'으로 갱신하는 것이 일반적입니다.
-                item.cost_price = item.product.purchase_price 
-                
-                item.final_amount = item.quantity * item.product.price
-                total_cost += (item.cost_price * item.quantity)
-                
-                item.save()
                 total_rev += item.final_amount
+                total_cost += (item.cost_price * item.quantity)
             
+            # 5. 최종 주문서 합계 업데이트
             order.total_revenue = total_rev
             order.total_cogs = total_cost
             order.save()
@@ -396,6 +413,7 @@ def order_update(request, pk):
     else:
         form = OrderForm(instance=order)
         formset = OrderCreateFormSet(instance=order)
+        
     context = {'form': form, 'formset': formset, 'order': order, 'products_all': Product.objects.all(), 'title': f'주문서 수정 (#{order.id})'}
     return render(request, 'fulfillment/order_edit.html', context)
 
