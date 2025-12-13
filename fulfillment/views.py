@@ -322,23 +322,40 @@ def order_list(request):
 def order_create(request):
     if request.method == 'POST':
         form = OrderForm(request.POST)
+        # 팝업에서 prefix='items'를 썼으므로 여기서도 맞춰줘야 합니다.
         formset = OrderCreateFormSet(request.POST, prefix='items')
+        
         if form.is_valid() and formset.is_valid():
             order = form.save(commit=False)
             order.status = 'PENDING'
             order.save()
             
             items = formset.save(commit=False)
-            total_rev = 0
+            total_rev = 0  # 총 매출액
+            total_cost = 0 # 총 원가 (추가됨)
+            
             for item in items:
                 item.order = order
+                # 1. 매출액 계산 (판매단가 * 수량)
                 item.final_amount = item.quantity * item.product.price
+                
+                # 2. 원가 계산 로직 추가 (매입단가 * 수량)
+                # 상품 정보에 매입가(purchase_price)가 0원이면 원가도 0원이 됩니다.
+                current_cost = item.product.purchase_price * item.quantity
+                
                 item.save()
+                
                 total_rev += item.final_amount
+                total_cost += current_cost
             
+            # 주문 총액 및 총원가 업데이트
             order.total_revenue = total_rev
+            order.total_cogs = total_cost # DB에 원가 저장
             order.save()
+            
             return redirect('fulfillment:order_list')
+            
+    # POST가 아니거나 실패하면 목록으로 돌아감
     return redirect('fulfillment:order_list')
 
 @login_required
@@ -350,13 +367,31 @@ def order_update(request, pk):
         if form.is_valid() and formset.is_valid():
             order = form.save()
             items = formset.save(commit=False)
+            
+            # 삭제된 항목 처리
             for obj in formset.deleted_objects: obj.delete()
+            
             total_rev = 0
+            total_cost = 0 # 총 원가
+            
             for item in items:
-                item.order = order; item.final_amount = item.quantity * item.product.price; item.save()
+                item.order = order
+                # 1. 매출액 재계산
+                item.final_amount = item.quantity * item.product.price
+                
+                # 2. 원가 재계산 (추가됨)
+                current_cost = item.product.purchase_price * item.quantity
+                
+                item.save()
+                
                 total_rev += item.final_amount
-            order.total_revenue = sum(i.final_amount for i in order.items.all())
+                total_cost += current_cost
+            
+            # 주문 업데이트
+            order.total_revenue = total_rev
+            order.total_cogs = total_cost # DB에 원가 저장
             order.save()
+            
             return redirect('fulfillment:order_list')
     else:
         form = OrderForm(instance=order)
