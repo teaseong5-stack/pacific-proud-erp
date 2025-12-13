@@ -4,6 +4,9 @@ from . import views
 app_name = 'fulfillment'
 
 urlpatterns = [
+    # ★ [핵심 수정] 메인 페이지('') 접속 시 대시보드로 연결
+    path('', views.dashboard, name='index'), 
+
     # 1. 대시보드
     path('dashboard/', views.dashboard, name='dashboard'),
 
@@ -15,21 +18,21 @@ urlpatterns = [
     path('inventory/', views.inventory_list, name='inventory_list'),
     path('inventory/update/<int:pk>/', views.inventory_update, name='inventory_update'),
     path('inventory/delete/<int:pk>/', views.inventory_delete, name='inventory_delete'),
-    path('inventory/export/', views.export_inventory_excel, name='export_inventory_excel'), # 추가됨
+    path('inventory/export/', views.export_inventory_excel, name='export_inventory_excel'),
 
-    # 4. 발주/매입 (+엑셀) -> ★ 에러 원인 해결 부분
+    # 4. 발주/매입 (+엑셀)
     path('purchases/', views.purchase_list, name='purchase_list'),
     path('purchases/create/', views.purchase_create, name='purchase_create'),
     path('purchases/update/<int:pk>/', views.purchase_update, name='purchase_update'),
     path('purchases/delete/<int:pk>/', views.purchase_delete, name='purchase_delete'),
-    path('purchases/export/', views.export_purchase_excel, name='export_purchase_excel'), # ★ 추가됨
+    path('purchases/export/', views.export_purchase_excel, name='export_purchase_excel'),
 
     # 5. 주문/출고 (+엑셀)
     path('orders/', views.order_list, name='order_list'),
     path('orders/create/', views.order_create, name='order_create'),
     path('orders/update/<int:pk>/', views.order_update, name='order_update'),
     path('orders/delete/<int:pk>/', views.order_delete, name='order_delete'),
-    path('orders/export/', views.export_order_excel, name='export_order_excel'), # 추가됨
+    path('orders/export/', views.export_order_excel, name='export_order_excel'),
     
     # 주문 프로세스 (피킹 -> 중량 -> 명세서)
     path('order/<int:pk>/allocate/', views.order_allocate, name='order_allocate'),
