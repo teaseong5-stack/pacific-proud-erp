@@ -93,7 +93,7 @@
                     <td>전일 잔액 이월 (Carry-over)</td>
                     <td class="text-right">-</td>
                     <td class="text-right">-</td>
-                    <td class="text-right fw-bold">{{ carry_over_balance|floatform:0 }}</td>
+                    <td class="text-right fw-bold">{{ carry_over_balance|floatformat:0 }}</td>
                 </tr>
 
                 {% for t in transactions %}
@@ -103,13 +103,13 @@
                     <td class="text-left">{{ t.desc }}</td>
                     
                     <td class="text-right">
-                        {% if t.amount > 0 %}{{ t.amount|floatform:0 }}{% else %}-{% endif %}
+                        {% if t.amount > 0 %}{{ t.amount|floatformat:0 }}{% else %}-{% endif %}
                     </td>
                     <td class="text-right">
                         {% if t.amount < 0 %}{{ t.amount|stringformat:"d"|slice:"1:" }}{% else %}-{% endif %}
                     </td>
                     
-                    <td class="text-right">{{ t.balance|floatform:0 }}</td>
+                    <td class="text-right">{{ t.balance|floatformat:0 }}</td>
                 </tr>
                 {% endfor %}
 
@@ -125,20 +125,20 @@
             <table class="summary-table">
                 <tr>
                     <th width="70%">① 기초 이월 잔액</th>
-                    <td>{{ carry_over_balance|floatform:0 }}</td>
+                    <td>{{ carry_over_balance|floatformat:0 }}</td>
                 </tr>
                 <tr>
                     <th>② 기간 내 합계 (매출/청구)</th>
-                    <td>+ {{ total_sales|floatform:0 }}</td>
+                    <td>+ {{ total_sales|floatformat:0 }}</td>
                 </tr>
                 <tr>
                     <th>③ 기간 내 합계 (입금/지급)</th>
-                    <td>- {{ total_paid|floatform:0 }}</td>
+                    <td>- {{ total_paid|floatformat:0 }}</td>
                 </tr>
                 <tr><td colspan="2"><hr style="border-top: 1px solid #000; margin: 10px 0;"></td></tr>
                 <tr>
                     <th style="font-size: 14pt;">④ 최종 잔액</th>
-                    <td style="font-size: 14pt;">{{ final_balance|floatform:0 }}</td>
+                    <td style="font-size: 14pt;">{{ final_balance|floatformat:0 }}</td>
                 </tr>
             </table>
         </div>
