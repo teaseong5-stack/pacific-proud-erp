@@ -835,9 +835,13 @@ def location_delete(request, pk):
     
 @login_required
 def print_partner_ledger(request, pk):
-    """거래처 원장 인쇄용 페이지 (HTML)"""
+    """거래처 원장 인쇄용 페이지 (상품명 상세 표시 + 콤마 적용)"""
     partner = get_object_or_404(Partner, pk=pk)
     
+    my_company = CompanyInfo.objects.first()
+    if not my_company:
+        my_company = CompanyInfo(name="(회사정보 미설정)", owner_name="-", address="-", phone="-")
+
     # 1. 조회 기간 설정
     start_date_str = request.GET.get('start_date')
     end_date_str = request.GET.get('end_date')
@@ -852,35 +856,67 @@ def print_partner_ledger(request, pk):
     else:
         end_date = timezone.now().date()
 
-    # 2. 데이터 수집 (기존 로직 동일)
+    # 2. 데이터 수집
     transactions = []
 
-    # (1) 매출
+    # (1) 매출 (Client) - 상품명 가져오기
     if partner.partner_type in ['CLIENT', 'BOTH']:
-        orders = partner.order_set.filter(status='SHIPPED')
+        # prefetch_related를 써서 상품 정보를 미리 가져옵니다 (성능 최적화)
+        orders = partner.order_set.filter(status='SHIPPED').prefetch_related('items__product')
+        
         for o in orders:
+            # 해당 주문의 모든 상품명 리스트 만들기
+            item_names = [item.product.name for item in o.items.all()]
+            
+            if item_names:
+                # 상품이 여러 개면 "사과, 배, 포도" 식으로 나열
+                # 너무 길어질 경우를 대비해 20자 정도에서 자르거나, 지금처럼 다 보여주거나 선택 가능합니다.
+                # 여기서는 상세하게 다 보여주는 방식으로 작성합니다.
+                desc_text = ", ".join(item_names)
+            else:
+                desc_text = f"주문 #{o.id} (품목 없음)"
+                
             transactions.append({
-                'date': o.order_date.date(), 'type': '매출', 'desc': f"주문 #{o.id} ({o.items.count()}종)",
-                'amount': o.total_revenue, 'obj': o
+                'date': o.order_date.date(), 
+                'type': '매출', 
+                'desc': desc_text, # ★ 상품명으로 변경됨
+                'amount': o.total_revenue, 
+                'obj': o
             })
-    # (2) 매입
+
+    # (2) 매입 (Supplier) - 상품명 가져오기
     if partner.partner_type in ['SUPPLIER', 'BOTH']:
-        purchases = partner.purchase_set.filter(status='RECEIVED')
+        purchases = partner.purchase_set.filter(status='RECEIVED').prefetch_related('items__product')
+        
         for p in purchases:
+            item_names = [item.product.name for item in p.items.all()]
+            
+            if item_names:
+                desc_text = ", ".join(item_names)
+            else:
+                desc_text = f"발주 #{p.id} (품목 없음)"
+
             transactions.append({
-                'date': p.purchase_date, 'type': '매입', 'desc': f"발주 #{p.id}",
-                'amount': p.total_amount, 'obj': p
+                'date': p.purchase_date, 
+                'type': '매입', 
+                'desc': desc_text, # ★ 상품명으로 변경됨
+                'amount': p.total_amount, 
+                'obj': p
             })
-    # (3) 결제
+
+    # (3) 결제 (Payment)
     for pay in partner.payment_set.all():
         transactions.append({
-            'date': pay.date, 'type': pay.get_payment_type_display(), 'desc': pay.memo or "-",
-            'amount': -pay.amount, 'obj': pay
+            'date': pay.date, 
+            'type': pay.get_payment_type_display(), 
+            'desc': pay.memo or "(내용 없음)", # 결제는 메모를 표시
+            'amount': -pay.amount, 
+            'obj': pay
         })
 
     transactions.sort(key=lambda x: x['date'])
 
-    # 3. 이월 잔액 계산
+    # 3. 이월 잔액 계산 (기존 로직 동일)
     carry_over_balance = partner.initial_balance
     period_transactions = []
     period_total_sales = 0
@@ -900,10 +936,11 @@ def print_partner_ledger(request, pk):
     final_balance = carry_over_balance + period_total_sales - period_total_paid
 
     context = {
-        'partner': partner, 'start_date': start_date, 'end_date': end_date,
+        'partner': partner, 
+        'company': my_company,
+        'start_date': start_date, 'end_date': end_date,
         'carry_over_balance': carry_over_balance, 'transactions': period_transactions,
         'total_sales': period_total_sales, 'total_paid': period_total_paid,
         'final_balance': final_balance, 'today': timezone.now().date(),
     }
-    # ★ PDF 다운로드 대신 HTML 파일을 보여줍니다.
     return render(request, 'fulfillment/partner_ledger_print.html', context)
