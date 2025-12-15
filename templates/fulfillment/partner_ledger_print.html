@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ partner.name }}_원장</title>
+    <style>
+        body { font-family: "Malgun Gothic", sans-serif; font-size: 11pt; color: #000; margin: 0; padding: 20px; }
+        
+        /* 화면에는 보이지만 인쇄할 때는 숨기는 클래스 */
+        @media print {
+            .no-print { display: none !important; }
+            body { padding: 0; }
+        }
+
+        .container { width: 100%; max-width: 210mm; margin: 0 auto; } /* A4 너비 */
+        
+        /* 상단 헤더 */
+        .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #000; padding-bottom: 10px; }
+        .header h1 { margin: 0; font-size: 24pt; letter-spacing: 2px; }
+        .header .date-range { font-size: 12pt; margin-top: 10px; }
+
+        /* 정보 테이블 */
+        .info-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+        .info-table th { text-align: left; padding: 5px 10px; background-color: #f0f0f0; border: 1px solid #ccc; width: 15%; }
+        .info-table td { padding: 5px 10px; border: 1px solid #ccc; width: 35%; }
+
+        /* 메인 거래 내역 테이블 */
+        .ledger-table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
+        .ledger-table th, .ledger-table td { border: 1px solid #000; padding: 8px; font-size: 10pt; }
+        .ledger-table th { background-color: #eee; text-align: center; height: 30px; }
+        .ledger-table td { height: 25px; }
+        
+        .text-center { text-align: center; }
+        .text-right { text-align: right; }
+        .text-left { text-align: left; }
+        .fw-bold { font-weight: bold; }
+
+        /* 합계 요약 박스 */
+        .summary-box { border: 2px solid #000; padding: 15px; margin-top: 10px; page-break-inside: avoid; }
+        .summary-table { width: 100%; }
+        .summary-table th { text-align: left; font-size: 11pt; }
+        .summary-table td { text-align: right; font-size: 12pt; font-weight: bold; }
+
+        /* 하단 버튼 (인쇄 시 숨김) */
+        .btn-area { text-align: center; margin-bottom: 20px; padding: 10px; background: #f8f9fa; border: 1px solid #ddd; }
+        .btn { padding: 8px 20px; background-color: #2c3e50; color: white; border: none; cursor: pointer; font-size: 14px; border-radius: 4px; text-decoration: none; display: inline-block; }
+        .btn:hover { background-color: #1a252f; }
+    </style>
+</head>
+<body>
+
+    <div class="no-print btn-area">
+        <button class="btn" onclick="window.print()">🖨️ 인쇄하기</button>
+        <button class="btn" onclick="window.close()" style="background-color: #95a5a6; margin-left: 10px;">닫기</button>
+    </div>
+
+    <div class="container">
+        <div class="header">
+            <h1>거래처 원장</h1>
+            <div class="date-range">조회 기간: {{ start_date|date:"Y년 m월 d일" }} ~ {{ end_date|date:"Y년 m월 d일" }}</div>
+        </div>
+
+        <table class="info-table">
+            <tr>
+                <th>상호명</th>
+                <td>{{ partner.name }}</td>
+                <th>담당자</th>
+                <td>{{ partner.contact_person|default:"-" }}</td>
+            </tr>
+            <tr>
+                <th>연락처</th>
+                <td>{{ partner.phone|default:"-" }}</td>
+                <th>이메일</th>
+                <td>{{ partner.email|default:"-" }}</td>
+            </tr>
+        </table>
+
+        <table class="ledger-table">
+            <thead>
+                <tr>
+                    <th width="12%">일자</th>
+                    <th width="10%">구분</th>
+                    <th>적요</th>
+                    <th width="15%">매출/청구 (+)</th>
+                    <th width="15%">입금/지급 (-)</th>
+                    <th width="15%">잔액</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr style="background-color: #fafafa;">
+                    <td class="text-center">-</td>
+                    <td class="text-center">이월</td>
+                    <td>전일 잔액 이월 (Carry-over)</td>
+                    <td class="text-right">-</td>
+                    <td class="text-right">-</td>
+                    <td class="text-right fw-bold">{{ carry_over_balance|floatform:0 }}</td>
+                </tr>
+
+                {% for t in transactions %}
+                <tr>
+                    <td class="text-center">{{ t.date|date:"Y-m-d" }}</td>
+                    <td class="text-center">{{ t.type }}</td>
+                    <td class="text-left">{{ t.desc }}</td>
+                    
+                    <td class="text-right">
+                        {% if t.amount > 0 %}{{ t.amount|floatform:0 }}{% else %}-{% endif %}
+                    </td>
+                    <td class="text-right">
+                        {% if t.amount < 0 %}{{ t.amount|stringformat:"d"|slice:"1:" }}{% else %}-{% endif %}
+                    </td>
+                    
+                    <td class="text-right">{{ t.balance|floatform:0 }}</td>
+                </tr>
+                {% endfor %}
+
+                {% if not transactions %}
+                <tr>
+                    <td colspan="6" class="text-center" style="padding: 20px; color: #888;">조회 기간 내 거래 내역이 없습니다.</td>
+                </tr>
+                {% endif %}
+            </tbody>
+        </table>
+
+        <div class="summary-box">
+            <table class="summary-table">
+                <tr>
+                    <th width="70%">① 기초 이월 잔액</th>
+                    <td>{{ carry_over_balance|floatform:0 }}</td>
+                </tr>
+                <tr>
+                    <th>② 기간 내 합계 (매출/청구)</th>
+                    <td>+ {{ total_sales|floatform:0 }}</td>
+                </tr>
+                <tr>
+                    <th>③ 기간 내 합계 (입금/지급)</th>
+                    <td>- {{ total_paid|floatform:0 }}</td>
+                </tr>
+                <tr><td colspan="2"><hr style="border-top: 1px solid #000; margin: 10px 0;"></td></tr>
+                <tr>
+                    <th style="font-size: 14pt;">④ 최종 잔액</th>
+                    <td style="font-size: 14pt;">{{ final_balance|floatform:0 }}</td>
+                </tr>
+            </table>
+        </div>
+
+        <div style="margin-top: 30px; text-align: center; font-size: 10pt; color: #555;">
+            출력일: {{ today|date:"Y-m-d H:i" }} | PACIFIC PROUD ERP
+        </div>
+    </div>
+
+</body>
+</html>

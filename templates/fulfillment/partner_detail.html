@@ -65,16 +65,18 @@
                 <label class="small fw-bold">종료일</label>
                 <input type="date" name="end_date" class="form-control form-control-sm" value="{{ request.GET.end_date }}">
             </div>
+            
             <div class="col-auto">
                 <button type="submit" class="btn btn-sm btn-secondary">
                     <i class="bi bi-search"></i> 조회
                 </button>
-                <a href="{% url 'fulfillment:export_partner_ledger_pdf' partner.id %}?{{ request.GET.urlencode }}" class="btn btn-sm btn-danger" target="_blank">
-                    <i class="bi bi-file-earmark-pdf"></i> PDF 원장 출력
+                
+                <a href="{% url 'fulfillment:print_partner_ledger' partner.id %}?{{ request.GET.urlencode }}" class="btn btn-sm btn-dark" target="_blank">
+                    <i class="bi bi-printer"></i> 원장 인쇄
                 </a>
             </div>
         </form>
-    </div>
+        </div>
 </div>
 
 <div class="card shadow-sm">
