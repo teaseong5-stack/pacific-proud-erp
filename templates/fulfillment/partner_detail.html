@@ -54,6 +54,29 @@
     </div>
 </div>
 
+<div class="card shadow-sm mb-4">
+    <div class="card-body bg-light py-3">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-auto">
+                <label class="small fw-bold">시작일</label>
+                <input type="date" name="start_date" class="form-control form-control-sm" value="{{ request.GET.start_date }}">
+            </div>
+            <div class="col-auto">
+                <label class="small fw-bold">종료일</label>
+                <input type="date" name="end_date" class="form-control form-control-sm" value="{{ request.GET.end_date }}">
+            </div>
+            <div class="col-auto">
+                <button type="submit" class="btn btn-sm btn-secondary">
+                    <i class="bi bi-search"></i> 조회
+                </button>
+                <a href="{% url 'fulfillment:export_partner_ledger_pdf' partner.id %}?{{ request.GET.urlencode }}" class="btn btn-sm btn-danger" target="_blank">
+                    <i class="bi bi-file-earmark-pdf"></i> PDF 원장 출력
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
 <div class="card shadow-sm">
     <div class="card-header bg-light fw-bold">
         <i class="bi bi-list-ul me-2"></i> 상세 거래 내역
@@ -137,6 +160,7 @@
                 <h5 class="modal-title">💰 입출금/결제 등록</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
+            
             <form method="post" action="{% url 'fulfillment:partner_payment_create' partner.id %}">
                 {% csrf_token %}
                 <div class="modal-body">
@@ -185,7 +209,7 @@
                     <button type="submit" class="btn btn-success">등록 완료</button>
                 </div>
             </form>
-        </div>
+            </div>
     </div>
 </div>
 {% endblock %}

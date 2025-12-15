@@ -28,7 +28,7 @@ from .forms import (
     ExpenseForm, EmployeeForm, PayrollForm, CompanyInfoForm,
     BankAccountForm, WorkLogForm, BankTransactionForm, SignUpForm,
     PurchaseCreateFormSet, OrderCreateFormSet, PaymentQuickForm,
-    ZoneForm, LocationForm
+    ZoneForm, LocationForm,
 )
 
 # ---------------------------------------------------------
@@ -831,3 +831,118 @@ def location_delete(request, pk):
     obj = get_object_or_404(Location, pk=pk)
     if request.method == 'POST': obj.delete(); return redirect('fulfillment:location_list')
     return render(request, 'fulfillment/common_delete.html', {'object': obj, 'back_url': 'fulfillment:location_list'})
+    
+@login_required
+def export_partner_ledger_pdf(request, pk):
+    """거래처 원장 PDF 출력 (조회 기간 연동)"""
+    partner = get_object_or_404(Partner, pk=pk)
+    
+    # 1. 조회 기간 설정
+    start_date_str = request.GET.get('start_date')
+    end_date_str = request.GET.get('end_date')
+    
+    if start_date_str:
+        start_date = timezone.datetime.strptime(start_date_str, '%Y-%m-%d').date()
+    else:
+        start_date = timezone.now().date().replace(day=1) # 기본값: 이번 달 1일
+
+    if end_date_str:
+        end_date = timezone.datetime.strptime(end_date_str, '%Y-%m-%d').date()
+    else:
+        end_date = timezone.now().date() # 기본값: 오늘
+
+    # 2. 전체 트랜잭션 수집 (매출/매입/결제)
+    transactions = []
+
+    # (1) 매출 (Client)
+    if partner.partner_type in ['CLIENT', 'BOTH']:
+        orders = partner.order_set.filter(status='SHIPPED')
+        for o in orders:
+            transactions.append({
+                'date': o.order_date.date(),
+                'type': '매출',
+                'desc': f"주문 #{o.id} ({o.items.count()}종)",
+                'amount': o.total_revenue,  # 매출은 잔액 증가 (+)
+                'obj': o
+            })
+
+    # (2) 매입 (Supplier)
+    if partner.partner_type in ['SUPPLIER', 'BOTH']:
+        purchases = partner.purchase_set.filter(status='RECEIVED')
+        for p in purchases:
+            transactions.append({
+                'date': p.purchase_date,
+                'type': '매입',
+                'desc': f"발주 #{p.id}",
+                'amount': p.total_amount,   # 매입은 잔액 증가 (+) (지급해야 할 돈)
+                'obj': p
+            })
+
+    # (3) 입출금 (Payment)
+    payments = partner.payment_set.all()
+    for pay in payments:
+        # 입금/출금은 외상값을 갚는 것이므로 잔액 감소 (-)
+        transactions.append({
+            'date': pay.date,
+            'type': pay.get_payment_type_display(),
+            'desc': pay.memo or "-",
+            'amount': -pay.amount, 
+            'obj': pay
+        })
+
+    # 3. 날짜순 정렬
+    transactions.sort(key=lambda x: x['date'])
+
+    # 4. 이월 잔액 및 기간 내 내역 분리
+    carry_over_balance = partner.initial_balance # 기초 잔액
+    period_transactions = []
+    
+    period_total_sales = 0   # 기간 내 매출/매입 합계
+    period_total_paid = 0    # 기간 내 입금/지급 합계
+
+    for t in transactions:
+        if t['date'] < start_date:
+            # 조회 기간 전: 잔액에만 반영 (이월 잔액)
+            carry_over_balance += t['amount']
+        elif t['date'] <= end_date:
+            # 조회 기간 내: 리스트에 추가하고 잔액 계산
+            if t['amount'] > 0: period_total_sales += t['amount']
+            else: period_total_paid += abs(t['amount'])
+            
+            # 현재 줄의 잔액 계산
+            running_balance = carry_over_balance + period_total_sales - period_total_paid
+            
+            t['balance'] = running_balance
+            period_transactions.append(t)
+    
+    # 최종 잔액
+    final_balance = carry_over_balance + period_total_sales - period_total_paid
+
+    # 5. PDF 렌더링
+    context = {
+        'partner': partner,
+        'start_date': start_date,
+        'end_date': end_date,
+        'carry_over_balance': carry_over_balance,
+        'transactions': period_transactions,
+        'total_sales': period_total_sales,
+        'total_paid': period_total_paid,
+        'final_balance': final_balance,
+        'today': timezone.now().date(),
+    }
+    
+    html_string = render_to_string('fulfillment/partner_ledger_pdf.html', context)
+    pdf_file = weasyprint.HTML(string=html_string).write_pdf()
+
+    response = HttpResponse(pdf_file, content_type='application/pdf')
+    filename = f"Ledger_{partner.name}_{start_date.strftime('%Y%m%d')}-{end_date.strftime('%Y%m%d')}.pdf"
+    # 한글 파일명 깨짐 방지
+    try:
+        filename.encode('ascii')
+        file_expr = f'filename="{filename}"'
+    except UnicodeEncodeError:
+        import urllib.parse
+        file_expr = f"filename*=UTF-8''{urllib.parse.quote(filename)}"
+        
+    response['Content-Disposition'] = f'inline; {file_expr}'
+    return response    

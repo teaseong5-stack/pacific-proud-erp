@@ -68,6 +68,8 @@ urlpatterns = [
     path('partners/update/<int:pk>/', views.partner_update, name='partner_update'),
     path('partners/delete/<int:pk>/', views.partner_delete, name='partner_delete'),
     path('partners/<int:pk>/', views.partner_detail, name='partner_detail'),
+    # 거래처 원장 PDF 출력 (추가)
+    path('partners/<int:pk>/ledger/pdf/', views.export_partner_ledger_pdf, name='export_partner_ledger_pdf'),
     
     # 거래처 입출금 (Payment)
     path('partners/<int:pk>/payment/create/', views.partner_payment_create, name='partner_payment_create'),
