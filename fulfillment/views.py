@@ -12,6 +12,10 @@ from django.contrib import messages
 from django.core.paginator import Paginator # <--- Paginator 확인
 import weasyprint
 
+# 관리자 권한 확인 함수
+def is_superuser(user):
+    return user.is_superuse
+
 # ---------------------------------------------------------
 # [1] 모델 (Models)
 # ---------------------------------------------------------
@@ -994,4 +998,71 @@ def notice_detail(request, pk):
     if notice.author != request.user:
         notice.views += 1
         notice.save()
-    return render(request, 'fulfillment/notice_detail.html', {'notice': notice})   
+    return render(request, 'fulfillment/notice_detail.html', {'notice': notice})
+
+# ---------------------------------------------------------
+#  [추가] 입출금 내역 수정 (관리자 전용)
+# ---------------------------------------------------------
+@login_required
+@user_passes_test(is_superuser)  # 관리자만 접근 가능
+def bank_transaction_update(request, pk):
+    transaction = get_object_or_404(BankTransaction, pk=pk)
+    bank_account = transaction.bank_account
+    
+    # 수정 전 기존 데이터 저장 (차액 계산용)
+    old_amount = transaction.amount
+    old_type = transaction.transaction_type # 'DEPOSIT' or 'WITHDRAW'
+
+    if request.method == 'POST':
+        form = BankTransactionForm(request.POST, instance=transaction)
+        if form.is_valid():
+            # 1. 기존 거래 내역 취소 (잔액 원복)
+            if old_type == 'DEPOSIT':
+                bank_account.current_balance -= old_amount
+            else:
+                bank_account.current_balance += old_amount
+            
+            # 2. 새로운 내용 저장
+            new_trans = form.save(commit=False)
+            new_trans.save()
+            
+            # 3. 새로운 금액으로 잔액 재계산
+            if new_trans.transaction_type == 'DEPOSIT':
+                bank_account.current_balance += new_trans.amount
+            else:
+                bank_account.current_balance -= new_trans.amount
+            
+            bank_account.save() # 최종 잔액 저장
+            
+            return redirect('fulfillment:bank_detail', pk=bank_account.id)
+    else:
+        form = BankTransactionForm(instance=transaction)
+
+    return render(request, 'fulfillment/form_base.html', {
+        'form': form,
+        'title': '거래 내역 수정 (관리자)',
+        'submit_text': '수정 완료'
+    })
+
+# ---------------------------------------------------------
+#  [추가] 입출금 내역 삭제 (관리자 전용)
+# ---------------------------------------------------------
+@login_required
+@user_passes_test(is_superuser)  # 관리자만 접근 가능
+def bank_transaction_delete(request, pk):
+    transaction = get_object_or_404(BankTransaction, pk=pk)
+    bank_account = transaction.bank_account
+    
+    if request.method == 'POST':
+        # 삭제 전 잔액 원복 (롤백)
+        if transaction.transaction_type == 'DEPOSIT':
+            bank_account.current_balance -= transaction.amount # 입금 건 삭제니 잔액 차감
+        else:
+            bank_account.current_balance += transaction.amount # 출금 건 삭제니 잔액 복구
+            
+        bank_account.save()
+        transaction.delete()
+        
+        return redirect('fulfillment:bank_detail', pk=bank_account.id)
+        
+    return redirect('fulfillment:bank_detail', pk=bank_account.id)    

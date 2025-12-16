@@ -92,6 +92,9 @@ urlpatterns = [
     path('banks/create/', views.bank_create, name='bank_create'),
     path('banks/transaction/create/', views.bank_transaction_create, name='bank_transaction_create'),
     path('banks/<int:pk>/', views.bank_detail, name='bank_detail'),
+    # ★ [추가] 입출금 내역 수정/삭제
+    path('banks/transaction/update/<int:pk>/', views.bank_transaction_update, name='bank_transaction_update'),
+    path('banks/transaction/delete/<int:pk>/', views.bank_transaction_delete, name='bank_transaction_delete'),
 
     # 10. 기초정보 - 창고/위치
     path('locations/', views.location_list, name='location_list'),
