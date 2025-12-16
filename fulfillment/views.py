@@ -1,6 +1,6 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.utils import timezone
-from django.db.models import Sum, Q
+from django.db.models import Sum, Q  # <--- Q 확인
 from django.db.models.functions import TruncDay
 from datetime import timedelta
 from django.http import HttpResponse
@@ -9,7 +9,7 @@ from decimal import Decimal
 from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from django.core.paginator import Paginator
+from django.core.paginator import Paginator # <--- Paginator 확인
 import weasyprint
 
 # ---------------------------------------------------------

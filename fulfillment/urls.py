@@ -8,6 +8,10 @@ urlpatterns = [
     path('', views.dashboard, name='index'), 
     path('dashboard/', views.dashboard, name='dashboard'),
 
+    # 0. 인증 (회원가입 등) - ★ [누락되어 오류 났던 부분 추가]
+    path('signup/', views.signup, name='signup'),
+    path('accounts/delete/', views.delete_account, name='delete_account'),
+
     # 1. 물류 (입고)
     path('inbound/', views.inbound_create, name='inbound_create'),
     path('label/<int:inventory_id>/', views.print_label, name='print_label'),
@@ -96,7 +100,7 @@ urlpatterns = [
     path('locations/create/', views.location_create, name='location_create'),
     path('locations/delete/<int:pk>/', views.location_delete, name='location_delete'),
 
-    # ★ 11. 공지사항 (Notices)
+    # ★ 11. 공지사항 (Notices) - [이 부분이 없어서 base.html이 터짐]
     path('notices/', views.notice_list, name='notice_list'),
     path('notices/create/', views.notice_create, name='notice_create'),
     path('notices/<int:pk>/', views.notice_detail, name='notice_detail'),
