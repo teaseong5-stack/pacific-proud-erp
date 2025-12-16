@@ -9,6 +9,9 @@ from decimal import Decimal
 from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+from .models import Notice
+from .forms import NoticeForm
+from django.core.paginator import Paginator
 import weasyprint
 
 # ---------------------------------------------------------
@@ -944,3 +947,50 @@ def print_partner_ledger(request, pk):
         'final_balance': final_balance, 'today': timezone.now().date(),
     }
     return render(request, 'fulfillment/partner_ledger_print.html', context)
+    
+# ---------------------------------------------------------
+#  SECTION 9: 공지사항 (Notice)
+# ---------------------------------------------------------
+@login_required
+def notice_list(request):
+    """공지사항 목록"""
+    query = request.GET.get('q', '')
+    notices = Notice.objects.all().order_by('-is_important', '-created_at')
+    
+    if query:
+        notices = notices.filter(Q(title__icontains=query) | Q(content__icontains=query))
+    
+    # 페이지네이션 (10개씩)
+    paginator = Paginator(notices, 10)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    
+    form = NoticeForm()
+    return render(request, 'fulfillment/notice_list.html', {
+        'notices': page_obj, 
+        'page_obj': page_obj,
+        'is_paginated': page_obj.has_other_pages(),
+        'form': form
+    })
+
+@login_required
+def notice_create(request):
+    """공지사항 등록"""
+    if request.method == 'POST':
+        form = NoticeForm(request.POST, request.FILES)
+        if form.is_valid():
+            notice = form.save(commit=False)
+            notice.author = request.user
+            notice.save()
+            return redirect('fulfillment:notice_list')
+    return redirect('fulfillment:notice_list')
+
+@login_required
+def notice_detail(request, pk):
+    """공지사항 상세"""
+    notice = get_object_or_404(Notice, pk=pk)
+    # 조회수 증가 (본인이 쓴 글이 아닐 때만)
+    if notice.author != request.user:
+        notice.views += 1
+        notice.save()
+    return render(request, 'fulfillment/notice_detail.html', {'notice': notice})    
