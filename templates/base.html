@@ -60,7 +60,7 @@
             }
             .overlay.active { display: block; }
             
-            /* 모바일에서는 상단 우측 헤더 숨김 (공간 부족) */
+            /* 모바일에서는 상단 우측 헤더 숨김 (공간 부족) -> 번역기 사용을 위해 보이게 할 수도 있지만 일단 유지 */
             .top-header { display: none !important; }
         }
 
@@ -70,7 +70,7 @@
         .sidebar .category { font-size: 0.75rem; text-transform: uppercase; color: #95a5a6; padding: 20px 20px 5px; font-weight: bold; letter-spacing: 1px; }
         .sidebar .brand { font-size: 1.3rem; font-weight: bold; padding: 20px; text-align: center; color: #fff; border-bottom: 1px solid #34495e; }
 
-        /* --- [추가] PC용 상단 헤더 스타일 --- */
+        /* --- [PC용 상단 헤더 스타일] --- */
         .top-header {
             background-color: #fff;
             padding: 10px 30px;
@@ -80,12 +80,30 @@
             align-items: center;
             margin-bottom: 20px;
             border-radius: 10px;
+            gap: 15px; /* 아이템 간 간격 */
         }
 
         /* 테이블 등 기타 스타일 */
         .table-responsive-mobile { overflow-x: auto; -webkit-overflow-scrolling: touch; }
         .card-body.p-0 { max-height: 75vh; overflow-y: auto; }
         .table thead th { position: sticky; top: 0; z-index: 2; background-color: #e9ecef; white-space: nowrap; }
+
+        /* --- [구글 번역기 커스텀 스타일] --- */
+        .goog-te-gadget { font-size: 0 !important; }
+        .goog-te-gadget span { display: none !important; }
+        .goog-te-gadget .goog-te-combo {
+            margin: 0 !important;
+            padding: 6px 10px;
+            border: 1px solid #dee2e6;
+            border-radius: 20px; /* 둥근 버튼 스타일 */
+            font-size: 14px;
+            color: #495057;
+            background-color: #f8f9fa;
+            cursor: pointer;
+            outline: none;
+        }
+        body { top: 0 !important; }
+        .goog-te-banner-frame { display: none !important; }
     </style>
 </head>
 <body>
@@ -131,6 +149,7 @@
         <a href="{% url 'fulfillment:location_list' %}"><i class="bi bi-diagram-3 me-2"></i> 창고/위치 관리</a>
         <a href="{% url 'fulfillment:partner_list' %}"><i class="bi bi-building me-2"></i> 거래처 관리</a>
         <a href="{% url 'fulfillment:product_list' %}"><i class="bi bi-tags me-2"></i> 상품 관리</a>
+        <a href="{% url 'fulfillment:notice_list' %}"><i class="bi bi-megaphone me-2"></i> 공지사항</a>
         
         <div class="mt-5 px-3 mb-4 text-center">
             <a href="{% url 'fulfillment:company_update' %}" class="btn btn-outline-light btn-sm w-100 mb-2">
@@ -149,6 +168,22 @@
     <div class="main-content-wrapper">
         
         <div class="top-header">
+            <div id="google_translate_element"></div>
+            
+            <script type="text/javascript">
+                function googleTranslateElementInit() {
+                    new google.translate.TranslateElement({
+                        pageLanguage: 'ko',      // 기본 언어: 한국어
+                        includedLanguages: 'ko,vi,en', // 변환 가능: 한국어, 베트남어, 영어
+                        layout: google.translate.TranslateElement.InlineLayout.SIMPLE,
+                        autoDisplay: false
+                    }, 'google_translate_element');
+                }
+            </script>
+            <script type="text/javascript" src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
+
+            <div class="topbar-divider d-none d-sm-block" style="width: 0; border-right: 1px solid #e3e6f0; height: 2rem; margin: 0 0.5rem;"></div>
+
             {% if user.is_authenticated %}
                 <div class="dropdown">
                     <button class="btn btn-light dropdown-toggle d-flex align-items-center gap-2 border-0 bg-transparent" type="button" data-bs-toggle="dropdown" aria-expanded="false">
