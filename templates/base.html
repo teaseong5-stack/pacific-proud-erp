@@ -60,7 +60,7 @@
             }
             .overlay.active { display: block; }
             
-            /* 모바일에서는 상단 우측 헤더 숨김 (공간 부족) -> 번역기 사용을 위해 보이게 할 수도 있지만 일단 유지 */
+            /* 모바일에서는 상단 우측 헤더 숨김 */
             .top-header { display: none !important; }
         }
 
@@ -95,7 +95,7 @@
             margin: 0 !important;
             padding: 6px 10px;
             border: 1px solid #dee2e6;
-            border-radius: 20px; /* 둥근 버튼 스타일 */
+            border-radius: 20px; 
             font-size: 14px;
             color: #495057;
             background-color: #f8f9fa;
@@ -122,6 +122,7 @@
 
         <div class="category">메인 (Main)</div>
         <a href="{% url 'fulfillment:dashboard' %}"><i class="bi bi-speedometer2 me-2"></i> CEO 대시보드</a>
+        <a href="{% url 'fulfillment:notice_list' %}"><i class="bi bi-megaphone me-2"></i> 공지사항</a>
 
         <div class="category">물류 관리 (Logistics)</div>
         {% if perms.fulfillment.view_inventory or user.is_superuser %}
@@ -149,7 +150,6 @@
         <a href="{% url 'fulfillment:location_list' %}"><i class="bi bi-diagram-3 me-2"></i> 창고/위치 관리</a>
         <a href="{% url 'fulfillment:partner_list' %}"><i class="bi bi-building me-2"></i> 거래처 관리</a>
         <a href="{% url 'fulfillment:product_list' %}"><i class="bi bi-tags me-2"></i> 상품 관리</a>
-        <a href="{% url 'fulfillment:notice_list' %}"><i class="bi bi-megaphone me-2"></i> 공지사항</a>
         
         <div class="mt-5 px-3 mb-4 text-center">
             <a href="{% url 'fulfillment:company_update' %}" class="btn btn-outline-light btn-sm w-100 mb-2">
@@ -173,8 +173,8 @@
             <script type="text/javascript">
                 function googleTranslateElementInit() {
                     new google.translate.TranslateElement({
-                        pageLanguage: 'ko',      // 기본 언어: 한국어
-                        includedLanguages: 'ko,vi,en', // 변환 가능: 한국어, 베트남어, 영어
+                        pageLanguage: 'ko',      
+                        includedLanguages: 'ko,vi,en', 
                         layout: google.translate.TranslateElement.InlineLayout.SIMPLE,
                         autoDisplay: false
                     }, 'google_translate_element');
