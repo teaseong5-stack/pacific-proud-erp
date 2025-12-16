@@ -1,0 +1,54 @@
+{% extends 'base.html' %}
+{% load humanize %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="h4 text-gray-800">
+            <i class="bi bi-info-circle me-2"></i>공지사항 상세
+        </h2>
+        <a href="{% url 'fulfillment:notice_list' %}" class="btn btn-secondary">
+            <i class="bi bi-list"></i> 목록으로
+        </a>
+    </div>
+
+    <div class="card shadow mb-4">
+        <div class="card-header py-3 bg-white">
+            <div class="d-flex align-items-center mb-2">
+                {% if notice.is_important %}
+                    <span class="badge bg-danger me-2">중요</span>
+                {% endif %}
+                <h4 class="m-0 font-weight-bold text-primary">{{ notice.title }}</h4>
+            </div>
+            <div class="text-muted small">
+                <span class="me-3"><i class="bi bi-person me-1"></i> {{ notice.author.username }}</span>
+                <span class="me-3"><i class="bi bi-calendar me-1"></i> {{ notice.created_at|date:"Y-m-d H:i" }}</span>
+                <span><i class="bi bi-eye me-1"></i> {{ notice.views }}회 조회</span>
+            </div>
+        </div>
+
+        <div class="card-body" style="min-height: 300px;">
+            <div class="p-3">
+                {{ notice.content|linebreaks }}
+            </div>
+        </div>
+
+        <div class="card-footer bg-light">
+            {% if notice.file %}
+            <div class="mb-3 p-3 bg-white border rounded">
+                <label class="fw-bold mb-2"><i class="bi bi-paperclip"></i> 첨부파일</label>
+                <div>
+                    <a href="{{ notice.file.url }}" class="text-decoration-none" download>
+                        {{ notice.file.name }} <i class="bi bi-download ms-1"></i>
+                    </a>
+                </div>
+            </div>
+            {% endif %}
+            
+            <div class="d-flex justify-content-end">
+                <a href="{% url 'fulfillment:notice_list' %}" class="btn btn-outline-secondary">목록</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
