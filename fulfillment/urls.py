@@ -96,7 +96,7 @@ urlpatterns = [
     path('locations/create/', views.location_create, name='location_create'),
     path('locations/delete/<int:pk>/', views.location_delete, name='location_delete'),
 
-    # ★ 11. 공지사항 (Notices) - [새로 추가된 부분]
+    # ★ 11. 공지사항 (Notices)
     path('notices/', views.notice_list, name='notice_list'),
     path('notices/create/', views.notice_create, name='notice_create'),
     path('notices/<int:pk>/', views.notice_detail, name='notice_detail'),

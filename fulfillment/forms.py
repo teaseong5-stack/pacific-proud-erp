@@ -7,7 +7,7 @@ from django.contrib.auth.models import User
 from .models import (
     Inventory, Product, Location, Partner, Purchase, PurchaseItem, 
     Order, OrderItem, Employee, Payroll, Expense, Payment, CompanyInfo,
-    BankAccount, BankTransaction, WorkLog, Zone
+    BankAccount, BankTransaction, WorkLog, Zone, Notice
 )
 
 # --- 회원가입 폼 ---
@@ -243,3 +243,15 @@ class LocationForm(forms.ModelForm):
             'code': forms.TextInput(attrs={'class': 'form-control'}),
             'is_active': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         }
+        
+# ★ [추가] 공지사항 폼
+class NoticeForm(forms.ModelForm):
+    class Meta:
+        model = Notice
+        fields = ['title', 'content', 'is_important', 'file']
+        widgets = {
+            'title': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '제목을 입력하세요'}),
+            'content': forms.Textarea(attrs={'class': 'form-control', 'rows': 10, 'placeholder': '내용을 입력하세요'}),
+            'file': forms.FileInput(attrs={'class': 'form-control'}),
+            'is_important': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+        }        

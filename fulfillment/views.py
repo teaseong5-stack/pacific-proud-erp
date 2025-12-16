@@ -9,8 +9,6 @@ from decimal import Decimal
 from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from .models import Notice
-from .forms import NoticeForm
 from django.core.paginator import Paginator
 import weasyprint
 
@@ -20,7 +18,7 @@ import weasyprint
 from .models import (
     Partner, Product, Purchase, PurchaseItem, Inventory, Order, OrderItem, 
     PickingList, Expense, Employee, Payroll, Payment, Zone, Location,
-    CompanyInfo, BankAccount, BankTransaction, WorkLog, ProductCategory, StorageType
+    CompanyInfo, BankAccount, BankTransaction, WorkLog, ProductCategory, StorageType, Notice
 )
 
 # ---------------------------------------------------------
@@ -32,7 +30,7 @@ from .forms import (
     ExpenseForm, EmployeeForm, PayrollForm, CompanyInfoForm,
     BankAccountForm, WorkLogForm, BankTransactionForm, SignUpForm,
     PurchaseCreateFormSet, OrderCreateFormSet, PaymentQuickForm,
-    ZoneForm, LocationForm,
+    ZoneForm, LocationForm, NoticeForm
 )
 
 # ---------------------------------------------------------
@@ -951,10 +949,12 @@ def print_partner_ledger(request, pk):
 # ---------------------------------------------------------
 #  SECTION 9: 공지사항 (Notice)
 # ---------------------------------------------------------
+
 @login_required
 def notice_list(request):
     """공지사항 목록"""
     query = request.GET.get('q', '')
+    # 중요 공지 먼저, 그 다음 최신순 정렬
     notices = Notice.objects.all().order_by('-is_important', '-created_at')
     
     if query:
@@ -965,7 +965,8 @@ def notice_list(request):
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
     
-    form = NoticeForm()
+    form = NoticeForm() # 등록 팝업용 빈 폼
+    
     return render(request, 'fulfillment/notice_list.html', {
         'notices': page_obj, 
         'page_obj': page_obj,
@@ -993,4 +994,4 @@ def notice_detail(request, pk):
     if notice.author != request.user:
         notice.views += 1
         notice.save()
-    return render(request, 'fulfillment/notice_detail.html', {'notice': notice})    
+    return render(request, 'fulfillment/notice_detail.html', {'notice': notice})   
