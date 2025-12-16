@@ -1,6 +1,7 @@
 from django.db import models
 from django.utils import timezone
 from django.db.models import Sum
+from django.contrib.auth.models import User
 
 # --- 1. 기초 정보 (Enum 정의) ---
 class StorageType(models.TextChoices):
