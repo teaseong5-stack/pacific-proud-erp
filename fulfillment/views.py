@@ -10,6 +10,7 @@ from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.core.paginator import Paginator # <--- Paginator 확인
+from django.contrib.auth.decorators import user_passes_test
 import weasyprint
 
 # 관리자 권한 확인 함수
