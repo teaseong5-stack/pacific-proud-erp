@@ -15,7 +15,7 @@ import weasyprint
 
 # 관리자 권한 확인 함수
 def is_superuser(user):
-    return user.is_superuse
+    return user.is_superuser
 
 # ---------------------------------------------------------
 # [1] 모델 (Models)
