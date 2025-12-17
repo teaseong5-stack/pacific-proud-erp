@@ -1,0 +1,68 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row justify-content-center">
+        <div class="col-lg-6 col-md-8">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3 bg-white">
+                    <h6 class="m-0 font-weight-bold text-primary">
+                        {{ title|default:"정보 수정" }}
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <form method="post" enctype="multipart/form-data">
+                        {% csrf_token %}
+                        
+                        {% for field in form %}
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">{{ field.label }}</label>
+                            
+                            {{ field }}
+                            
+                            {% if field.help_text %}
+                            <div class="form-text text-muted small">{{ field.help_text }}</div>
+                            {% endif %}
+                            
+                            {% if field.errors %}
+                            <div class="text-danger small mt-1">
+                                {{ field.errors.0 }}
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+
+                        <div class="d-flex justify-content-end gap-2 mt-4">
+                            <button type="button" class="btn btn-secondary" onclick="history.back()">
+                                <i class="bi bi-x-lg"></i> 취소
+                            </button>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-check-lg"></i> {{ submit_text|default:"저장" }}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // 폼 입력창에 자동으로 Bootstrap 스타일(form-control) 적용
+    document.addEventListener('DOMContentLoaded', function() {
+        var inputs = document.querySelectorAll('input:not([type="checkbox"]):not([type="radio"]), select, textarea');
+        inputs.forEach(function(input) {
+            if (!input.classList.contains('form-control') && !input.classList.contains('form-select')) {
+                input.classList.add('form-control');
+            }
+        });
+        
+        var checks = document.querySelectorAll('input[type="checkbox"], input[type="radio"]');
+        checks.forEach(function(check) {
+            if (!check.classList.contains('form-check-input')) {
+                check.classList.add('form-check-input');
+            }
+        });
+    });
+</script>
+{% endblock %}
