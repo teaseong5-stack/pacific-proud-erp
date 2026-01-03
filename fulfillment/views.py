@@ -23,7 +23,7 @@ def is_superuser(user):
 from .models import (
     Partner, Product, Purchase, PurchaseItem, Inventory, Order, OrderItem, 
     PickingList, Expense, Employee, Payroll, Payment, Zone, Location,
-    CompanyInfo, BankAccount, BankTransaction, WorkLog, ProductCategory, StorageType, Notice
+    CompanyInfo, BankAccount, BankTransaction, WorkLog, ProductCategory, StorageType, Notice, NoticeComment,
 )
 
 # ---------------------------------------------------------
@@ -35,7 +35,7 @@ from .forms import (
     ExpenseForm, EmployeeForm, PayrollForm, CompanyInfoForm,
     BankAccountForm, WorkLogForm, BankTransactionForm, SignUpForm,
     PurchaseCreateFormSet, OrderCreateFormSet, PaymentQuickForm,
-    ZoneForm, LocationForm, NoticeForm
+    ZoneForm, LocationForm, NoticeForm, NoticeCommentForm,
 )
 
 # ---------------------------------------------------------
