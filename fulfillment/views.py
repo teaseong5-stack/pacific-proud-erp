@@ -993,13 +993,48 @@ def notice_create(request):
 
 @login_required
 def notice_detail(request, pk):
-    """공지사항 상세"""
     notice = get_object_or_404(Notice, pk=pk)
-    # 조회수 증가 (본인이 쓴 글이 아닐 때만)
+    
+    # 조회수 증가
     if notice.author != request.user:
         notice.views += 1
         notice.save()
-    return render(request, 'fulfillment/notice_detail.html', {'notice': notice})
+        
+    # 댓글 입력 폼
+    comment_form = NoticeCommentForm()
+    
+    # 현재 사용자가 이미 확인했는지 여부
+    is_confirmed = notice.confirmed_users.filter(id=request.user.id).exists()
+
+    context = {
+        'notice': notice,
+        'comment_form': comment_form,
+        'is_confirmed': is_confirmed,
+    }
+    return render(request, 'fulfillment/notice_detail.html', context)
+    
+# 2. [추가] 댓글 등록 처리
+@login_required
+def notice_comment_create(request, pk):
+    notice = get_object_or_404(Notice, pk=pk)
+    if request.method == 'POST':
+        form = NoticeCommentForm(request.POST)
+        if form.is_valid():
+            comment = form.save(commit=False)
+            comment.author = request.user
+            comment.notice = notice
+            comment.save()
+    return redirect('fulfillment:notice_detail', pk=pk)
+
+# 3. [추가] 공지 확인(Check) 처리
+@login_required
+def notice_confirm(request, pk):
+    notice = get_object_or_404(Notice, pk=pk)
+    # 이미 확인하지 않았다면 추가
+    if not notice.confirmed_users.filter(id=request.user.id).exists():
+        notice.confirmed_users.add(request.user)
+    
+    return redirect('fulfillment:notice_detail', pk=pk)    
 
 # ---------------------------------------------------------
 #  [수정됨] 입출금 내역 수정 (관리자 전용)

@@ -25,9 +25,7 @@ class PartnerType(models.TextChoices):
 
 class ExpenseCategory(models.TextChoices):
     """비용 계정과목 정의"""
-    # ★ 추가된 항목: 물품대금
     PURCHASE = 'PURCHASE', '물품대금 (매입)' 
-    
     SALARY = 'SALARY', '급여/인건비'
     RENT = 'RENT', '임차료'
     UTILITY = 'UTILITY', '수도광열비 (전기/수도)'
@@ -36,7 +34,7 @@ class ExpenseCategory(models.TextChoices):
     TAX = 'TAX', '세금과공과'
     ETC = 'ETC', '기타 잡비'
 
-# --- 2. 자금 관리 (통장) ★ 순서 상단 이동! ---
+# --- 2. 자금 관리 (통장) ---
 class BankAccount(models.Model):
     """법인 통장 계좌"""
     bank_name = models.CharField(max_length=50, verbose_name="은행명")
@@ -54,7 +52,6 @@ class BankAccount(models.Model):
         out_total = self.transactions.filter(transaction_type='WITHDRAWAL').aggregate(s=Sum('amount'))['s'] or 0
         return self.initial_balance + in_total - out_total
 
-# Expense 모델은 BankTransaction과 서로 참조하므로 문자열 참조('Expense')를 사용해야 함
 class BankTransaction(models.Model):
     """통장 입출금 내역"""
     TYPE_CHOICES = [('DEPOSIT', '입금'), ('WITHDRAWAL', '출금')]
@@ -86,32 +83,16 @@ class Partner(models.Model):
 
     @property
     def current_balance(self):
-        """
-        현재 잔액 계산 (실시간)
-        - CLIENT(매출처): (기초 + 매출총액) - 입금총액 = 받을 돈 (양수)
-        - SUPPLIER(매입처): (기초 + 매입총액) - 출금총액 = 줄 돈 (양수 -> 음수로 표현하여 부채임을 표시)
-        """
-        # 1. 입출금 내역 집계
         deposit_total = self.payment_set.filter(payment_type='INBOUND').aggregate(s=Sum('amount'))['s'] or 0
         withdrawal_total = self.payment_set.filter(payment_type='OUTBOUND').aggregate(s=Sum('amount'))['s'] or 0
         
         if self.partner_type == 'CLIENT':
-            # 매출 총액 (출고완료 기준)
             sales_total = self.order_set.filter(status='SHIPPED').aggregate(s=Sum('total_revenue'))['s'] or 0
-            # (기초 + 매출) - (받은돈 - 거스름돈?) -> 보통 수금만 있음
             return (self.initial_balance + sales_total) - deposit_total
             
         elif self.partner_type == 'SUPPLIER':
-            # 매입 총액 (입고완료 기준) -> ★ 여기서 매입대금이 집계됩니다.
             purchase_total = self.purchase_set.filter(status='RECEIVED').aggregate(s=Sum('total_amount'))['s'] or 0
-            
-            # 줄 돈(매입액)에서 준 돈(출금)을 뺌. 
-            # 결과가 양수면 '줄 돈이 남았다(미지급금)'는 뜻.
-            # ERP 상에서는 미지급금을 '음수(-)'로 표현하여 자산과 구분하기도 함.
-            # 여기서는 [줄 돈 - 준 돈] 으로 계산하여, 양수면 빚이 있는 것.
             payable = (self.initial_balance + purchase_total) - withdrawal_total
-            
-            # 대시보드 합산을 위해 '미지급금'은 음수로 반환하는 것이 계산상 편함 (자산 감소)
             return payable * -1 
 
         return 0
@@ -148,9 +129,8 @@ class Purchase(models.Model):
     status = models.CharField(max_length=20, default='ORDERED', choices=[('ORDERED','발주됨'), ('RECEIVED','입고완료')])
     is_bill_published = models.BooleanField(default=False)
     def __str__(self): return f"매입 #{self.id}"
-    # ★ 추가된 메서드: 총금액 업데이트
+    
     def update_total_amount(self):
-        # 연결된 모든 아이템의 (수량*단가) 합계
         total = self.items.aggregate(
             total=Sum(models.F('quantity') * models.F('unit_cost'), output_field=models.DecimalField())
         )['total'] or 0
@@ -164,18 +144,14 @@ class PurchaseItem(models.Model):
     unit_cost = models.DecimalField(max_digits=10, decimal_places=0)
     target_location = models.ForeignKey(Location, on_delete=models.PROTECT)
     expiry_date = models.DateField()
+    
     def save(self, *args, **kwargs):
-        # 1. 단가 자동 설정
         if not self.unit_cost:
             self.unit_cost = self.product.purchase_price
-        
         super().save(*args, **kwargs)
-        
-        # 2. ★ 저장 후 부모(Purchase)의 총금액 재계산 (트리거)
         self.purchase.update_total_amount()
 
     def delete(self, *args, **kwargs):
-        # 3. 삭제 시에도 총금액 재계산
         purchase = self.purchase
         super().delete(*args, **kwargs)
         purchase.update_total_amount()
@@ -226,7 +202,7 @@ class PickingList(models.Model):
     picked = models.BooleanField(default=False)
     picked_weight = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
 
-# --- 7. 재무/회계 (Expense) ★ BankAccount 참조 가능! ---
+# --- 7. 재무/회계 (Expense) ---
 class Expense(models.Model):
     date = models.DateField(default=timezone.now, verbose_name="지출일자")
     category = models.CharField(max_length=20, choices=ExpenseCategory.choices, verbose_name="계정과목")
@@ -286,13 +262,17 @@ class Payroll(models.Model):
         else:
             exp = Expense.objects.create(date=self.payment_date, category=ExpenseCategory.SALARY, description=description, amount=self.total_amount, has_proof=True)
             self.related_expense = exp
-            super().save(update_fields=['related_expense'])
+            self.related_expense.save() # Update related_expense
+            # 재귀 호출 방지를 위해 update_fields 사용 안함, 이미 위에서 save됨. 
+            # 대신 Expense 연결을 위해 update
+            Payroll.objects.filter(pk=self.pk).update(related_expense=exp)
 
+# --- 9. 자금 거래 (거래처 원장) ---
 class Payment(models.Model):
     """자금 입출금 내역 (거래처 원장)"""
     PAYMENT_TYPE = [
-        ('INBOUND', '수금 (입금)'),   # 매출처에서 돈 받음 -> 통장 잔액 증가
-        ('OUTBOUND', '지급 (출금)'),  # 매입처에 돈 줌 -> 통장 잔액 감소
+        ('INBOUND', '수금 (입금)'),   
+        ('OUTBOUND', '지급 (출금)'),  
     ]
     
     partner = models.ForeignKey('Partner', on_delete=models.CASCADE, verbose_name="거래처")
@@ -302,29 +282,19 @@ class Payment(models.Model):
     method = models.CharField(max_length=20, default='CASH', choices=[('CASH','현금'), ('BANK','계좌이체'), ('CARD','카드')], verbose_name="결제수단")
     memo = models.CharField(max_length=100, blank=True, verbose_name="적요")
     
-    # ★ 추가됨: 연동할 법인 계좌
     bank_account = models.ForeignKey('BankAccount', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="연동 계좌")
-    
-    # 내부적으로 생성된 BankTransaction을 추적하기 위한 필드 (선택사항, 1:1 연결)
     related_bank_trx = models.OneToOneField('BankTransaction', on_delete=models.SET_NULL, null=True, blank=True, editable=False)
 
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
         
-        # 계좌가 선택되었다면 -> 통장 내역(BankTransaction) 자동 생성/수정
         if self.bank_account:
-            # 1. 거래 유형 결정 (Partner Payment 기준 -> Bank 기준 변환)
-            # 수금(INBOUND) -> 통장에선 입금(DEPOSIT)
-            # 지급(OUTBOUND) -> 통장에선 출금(WITHDRAWAL)
             trx_type = 'DEPOSIT' if self.payment_type == 'INBOUND' else 'WITHDRAWAL'
-            
-            # 적요 자동 생성 (예: [수금] 강남포차)
             desc = f"[{self.get_payment_type_display()}] {self.partner.name}"
             if self.memo:
                 desc += f" - {self.memo}"
 
             if self.related_bank_trx:
-                # 이미 연결된 내역이 있으면 업데이트
                 self.related_bank_trx.bank_account = self.bank_account
                 self.related_bank_trx.date = self.date
                 self.related_bank_trx.transaction_type = trx_type
@@ -332,8 +302,7 @@ class Payment(models.Model):
                 self.related_bank_trx.description = desc
                 self.related_bank_trx.save()
             else:
-                # 없으면 새로 생성
-                # BankTransaction 모델을 가져와야 함 (문자열 참조 회피)
+                # BankTransaction import 문제 방지를 위해 로컬 임포트 사용 (기존 유지)
                 from .models import BankTransaction 
                 
                 trx = BankTransaction.objects.create(
@@ -345,7 +314,7 @@ class Payment(models.Model):
                 )
                 self.related_bank_trx = trx
                 # 다시 저장 (연결 정보 업데이트)
-                super().save(update_fields=['related_bank_trx'])
+                Payment.objects.filter(pk=self.pk).update(related_bank_trx=trx)
 
     def __str__(self):
         return f"[{self.get_payment_type_display()}] {self.partner.name} - {self.amount}"
@@ -370,7 +339,7 @@ class CompanyInfo(models.Model):
             self.pk = CompanyInfo.objects.first().pk
         super().save(*args, **kwargs)
         
-# ★ [추가] 공지사항 모델
+# --- 10. 공지사항 (Notice & Comment) ---
 class Notice(models.Model):
     title = models.CharField(max_length=200, verbose_name="제목")
     content = models.TextField(verbose_name="내용")
@@ -380,6 +349,19 @@ class Notice(models.Model):
     views = models.PositiveIntegerField(default=0, verbose_name="조회수")
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="작성일")
     updated_at = models.DateTimeField(auto_now=True, verbose_name="수정일")
+    
+    # ★ [추가] 확인(읽음) 처리한 사용자 목록 (Many-to-Many)
+    confirmed_users = models.ManyToManyField(User, related_name='confirmed_notices', blank=True, verbose_name="확인한 사람들")
 
     def __str__(self):
-        return self.title        
+        return self.title
+
+class NoticeComment(models.Model):
+    """공지사항 댓글"""
+    notice = models.ForeignKey(Notice, on_delete=models.CASCADE, related_name='comments')
+    author = models.ForeignKey(User, on_delete=models.CASCADE, verbose_name="작성자")
+    content = models.TextField(verbose_name="댓글 내용")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="작성일")
+
+    def __str__(self):
+        return f"{self.author.username} - {self.content[:20]}"

@@ -12,41 +12,106 @@
         </a>
     </div>
 
-    <div class="card shadow mb-4">
-        <div class="card-header py-3 bg-white">
-            <div class="d-flex align-items-center mb-2">
-                {% if notice.is_important %}
-                    <span class="badge bg-danger me-2">중요</span>
-                {% endif %}
-                <h4 class="m-0 font-weight-bold text-primary">{{ notice.title }}</h4>
-            </div>
-            <div class="text-muted small">
-                <span class="me-3"><i class="bi bi-person me-1"></i> {{ notice.author.username }}</span>
-                <span class="me-3"><i class="bi bi-calendar me-1"></i> {{ notice.created_at|date:"Y-m-d H:i" }}</span>
-                <span><i class="bi bi-eye me-1"></i> {{ notice.views }}회 조회</span>
-            </div>
-        </div>
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3 bg-white">
+                    <div class="d-flex align-items-center mb-2">
+                        {% if notice.is_important %}
+                            <span class="badge bg-danger me-2">중요</span>
+                        {% endif %}
+                        <h4 class="m-0 font-weight-bold text-primary">{{ notice.title }}</h4>
+                    </div>
+                    <div class="text-muted small">
+                        <span class="me-3"><i class="bi bi-person me-1"></i> {{ notice.author.last_name }}{{ notice.author.first_name }} ({{ notice.author.username }})</span>
+                        <span class="me-3"><i class="bi bi-calendar me-1"></i> {{ notice.created_at|date:"Y-m-d H:i" }}</span>
+                        <span><i class="bi bi-eye me-1"></i> {{ notice.views }}회 조회</span>
+                    </div>
+                </div>
 
-        <div class="card-body" style="min-height: 300px;">
-            <div class="p-3">
-                {{ notice.content|linebreaks }}
-            </div>
-        </div>
+                <div class="card-body" style="min-height: 300px;">
+                    <div class="p-2">
+                        {{ notice.content|linebreaks }}
+                    </div>
+                </div>
 
-        <div class="card-footer bg-light">
-            {% if notice.file %}
-            <div class="mb-3 p-3 bg-white border rounded">
-                <label class="fw-bold mb-2"><i class="bi bi-paperclip"></i> 첨부파일</label>
-                <div>
-                    <a href="{{ notice.file.url }}" class="text-decoration-none" download>
-                        {{ notice.file.name }} <i class="bi bi-download ms-1"></i>
-                    </a>
+                <div class="card-footer bg-light">
+                    {% if notice.file %}
+                    <div class="mb-0 p-2 bg-white border rounded">
+                        <label class="fw-bold me-2"><i class="bi bi-paperclip"></i> 첨부파일:</label>
+                        <a href="{{ notice.file.url }}" class="text-decoration-none" download>
+                            {{ notice.file.name }} <i class="bi bi-download ms-1"></i>
+                        </a>
+                    </div>
+                    {% endif %}
                 </div>
             </div>
-            {% endif %}
-            
-            <div class="d-flex justify-content-end">
-                <a href="{% url 'fulfillment:notice_list' %}" class="btn btn-outline-secondary">목록</a>
+
+            <div class="card shadow mb-4">
+                <div class="card-header bg-light py-3">
+                    <h6 class="m-0 fw-bold text-dark"><i class="bi bi-chat-dots me-1"></i> 댓글 ({{ notice.comments.count }})</h6>
+                </div>
+                <div class="card-body">
+                    <ul class="list-group list-group-flush mb-3">
+                        {% for comment in notice.comments.all %}
+                        <li class="list-group-item px-0">
+                            <div class="d-flex justify-content-between">
+                                <strong class="text-dark">{{ comment.author.last_name }}{{ comment.author.first_name }}</strong>
+                                <small class="text-muted">{{ comment.created_at|date:"m-d H:i" }}</small>
+                            </div>
+                            <div class="text-secondary mt-1">{{ comment.content|linebreaksbr }}</div>
+                        </li>
+                        {% empty %}
+                        <li class="list-group-item text-center text-muted py-3">등록된 댓글이 없습니다.</li>
+                        {% endfor %}
+                    </ul>
+
+                    <form action="{% url 'fulfillment:notice_comment_create' notice.id %}" method="post">
+                        {% csrf_token %}
+                        <div class="input-group">
+                            {{ comment_form.content }}
+                            <button class="btn btn-primary" type="submit">등록</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card shadow mb-4">
+                <div class="card-header bg-primary text-white py-3">
+                    <h6 class="m-0 fw-bold"><i class="bi bi-check2-circle me-2"></i>공지 확인 (Check)</h6>
+                </div>
+                <div class="card-body text-center">
+                    {% if is_confirmed %}
+                        <div class="alert alert-success fw-bold mb-3">
+                            <i class="bi bi-check-lg me-1"></i> 확인 완료되었습니다.
+                        </div>
+                    {% else %}
+                        <div class="mb-3 text-muted small">
+                            내용을 모두 확인하셨다면 아래 버튼을 눌러주세요.
+                        </div>
+                        <a href="{% url 'fulfillment:notice_confirm' notice.id %}" class="btn btn-success w-100 py-2 fw-bold shadow-sm">
+                            <i class="bi bi-check-circle-fill me-2"></i> 네, 확인했습니다!
+                        </a>
+                    {% endif %}
+                    
+                    <hr>
+                    
+                    <h6 class="text-start fw-bold small text-muted mb-2">
+                        확인한 임직원 ({{ notice.confirmed_users.count }}명)
+                    </h6>
+                    <div class="d-flex flex-wrap gap-1">
+                        {% for user in notice.confirmed_users.all %}
+                            <span class="badge bg-light text-dark border" style="font-weight: normal;">
+                                <i class="bi bi-person-check-fill text-success me-1"></i>
+                                {{ user.last_name }}{{ user.first_name }}
+                            </span>
+                        {% empty %}
+                            <span class="text-muted small w-100 text-center py-2">아직 확인한 사람이 없습니다.</span>
+                        {% endfor %}
+                    </div>
+                </div>
             </div>
         </div>
     </div>

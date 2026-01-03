@@ -107,4 +107,6 @@ urlpatterns = [
     path('notices/', views.notice_list, name='notice_list'),
     path('notices/create/', views.notice_create, name='notice_create'),
     path('notices/<int:pk>/', views.notice_detail, name='notice_detail'),
+    path('notices/<int:pk>/comment/', views.notice_comment_create, name='notice_comment_create'),
+    path('notices/<int:pk>/confirm/', views.notice_confirm, name='notice_confirm'),
 ]

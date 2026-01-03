@@ -7,7 +7,7 @@ from django.contrib.auth.models import User
 from .models import (
     Inventory, Product, Location, Partner, Purchase, PurchaseItem, 
     Order, OrderItem, Employee, Payroll, Expense, Payment, CompanyInfo,
-    BankAccount, BankTransaction, WorkLog, Zone, Notice
+    BankAccount, BankTransaction, WorkLog, Zone, Notice, NoticeComment
 )
 
 # --- 회원가입 폼 ---
@@ -254,4 +254,20 @@ class NoticeForm(forms.ModelForm):
             'content': forms.Textarea(attrs={'class': 'form-control', 'rows': 10, 'placeholder': '내용을 입력하세요'}),
             'file': forms.FileInput(attrs={'class': 'form-control'}),
             'is_important': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+        }    
+
+# ★ [추가] 댓글 등록 폼
+class NoticeCommentForm(forms.ModelForm):
+    class Meta:
+        model = NoticeComment
+        fields = ['content']
+        widgets = {
+            'content': forms.Textarea(attrs={
+                'class': 'form-control', 
+                'rows': 3, 
+                'placeholder': '댓글이나 의견을 남겨주세요...'
+            }),
+        }
+        labels = {
+            'content': ''
         }        
