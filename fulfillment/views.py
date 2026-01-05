@@ -588,10 +588,36 @@ def bank_transaction_create(request):
         if form.is_valid(): form.save()
     return redirect('fulfillment:bank_list')
 @login_required
+@login_required
 def bank_detail(request, pk):
     account = get_object_or_404(BankAccount, pk=pk)
+    
+    # 1. 기본 정렬 (최신순)
     transactions = account.transactions.order_by('-date', '-id')
-    return render(request, 'fulfillment/bank_detail.html', {'account': account, 'transactions': transactions})
+
+    # 2. [추가] 기간 조회 필터링
+    start_date = request.GET.get('start_date')
+    end_date = request.GET.get('end_date')
+
+    if start_date:
+        transactions = transactions.filter(date__gte=start_date)
+    if end_date:
+        transactions = transactions.filter(date__lte=end_date)
+
+    # 3. [추가] 입금/출금 총합계 계산 (현재 조회된 내역 기준)
+    # aggregate는 딕셔너리를 반환하며, 결과가 없으면 None이므로 'or 0' 처리
+    deposit_total = transactions.filter(transaction_type='DEPOSIT').aggregate(s=Sum('amount'))['s'] or 0
+    withdraw_total = transactions.filter(transaction_type='WITHDRAWAL').aggregate(s=Sum('amount'))['s'] or 0
+
+    context = {
+        'account': account,
+        'transactions': transactions,
+        'deposit_total': deposit_total,   # 입금 합계 전달
+        'withdraw_total': withdraw_total, # 출금 합계 전달
+        'start_date': start_date,         # 검색 조건 유지를 위해 전달
+        'end_date': end_date,             # 검색 조건 유지를 위해 전달
+    }
+    return render(request, 'fulfillment/bank_detail.html', context)
 
 
 # =========================================================

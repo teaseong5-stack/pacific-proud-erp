@@ -2,85 +2,161 @@
 {% load humanize %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <div>
-        <h2>📜 입출금 거래 내역</h2>
-        <span class="text-muted fs-5">{{ account.bank_name }} <span class="mx-2">|</span> {{ account.account_number }}</span>
-    </div>
-    <div>
-        <span class="fs-4 fw-bold me-3">잔액: {{ account.current_balance|intcomma }} đ</span>
+<div class="container-fluid">
+    
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="h4 text-gray-800"><i class="bi bi-bank2 me-2"></i>입출금 거래 내역</h2>
+            <span class="text-muted">{{ account.bank_name }} <span class="mx-2">|</span> {{ account.account_number }}</span>
+        </div>
         <a href="{% url 'fulfillment:bank_list' %}" class="btn btn-secondary">
             <i class="bi bi-arrow-left"></i> 목록으로
         </a>
     </div>
-</div>
 
-<div class="card shadow">
-    <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
-        <h6 class="m-0 font-weight-bold text-primary">거래 내역 (Transactions)</h6>
-        <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#createTransactionModal">
-            <i class="bi bi-plus-lg"></i> 거래내역 추가
-        </button>
-    </div>
-    <div class="card-body p-0">
-        <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0 text-center">
-                <thead class="bg-light">
-                    <tr>
-                        <th>날짜</th>
-                        <th>구분</th>
-                        <th>적요</th>
-                        <th class="text-end">거래금액</th>
-                        <th class="text-end">잔액</th>
-                        <th>담당자</th>
-                        
-                        {% if user.is_superuser %}
-                        <th>관리</th>
-                        {% endif %}
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for tr in transactions %}
-                    <tr>
-                        <td>{{ tr.date|date:"Y-m-d" }}</td>
-                        <td>
-                            {% if tr.transaction_type == 'DEPOSIT' %}
-                                <span class="badge bg-primary">입금</span>
-                            {% else %}
-                                <span class="badge bg-danger">출금</span>
-                            {% endif %}
-                        </td>
-                        <td class="text-start ps-3">{{ tr.description }}</td>
-                        <td class="text-end fw-bold {% if tr.transaction_type == 'DEPOSIT' %}text-primary{% else %}text-danger{% endif %}">
-                            {{ tr.amount|intcomma }}
-                        </td>
-                        <td class="text-end text-muted">{{ tr.balance_after|intcomma }}</td>
-                        <td>{{ tr.created_by.username }}</td>
+    <div class="row mb-4">
+        <div class="col-md-4 mb-2">
+            <div class="card border-left-primary shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-secondary text-uppercase mb-1">현재 총 잔액 (Balance)</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ account.current_balance|intcomma }} 원</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="bi bi-wallet2 fs-2 text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
 
-                        {% if user.is_superuser %}
-                        <td>
-                            <div class="btn-group" role="group">
-                                <a href="{% url 'fulfillment:bank_transaction_update' tr.id %}" class="btn btn-sm btn-outline-secondary" title="수정">
-                                    <i class="bi bi-pencil-square"></i>
-                                </a>
-                                <form action="{% url 'fulfillment:bank_transaction_delete' tr.id %}" method="post" class="d-inline" onsubmit="return confirm('정말 삭제하시겠습니까? 잔액도 함께 변경됩니다.');">
-                                    {% csrf_token %}
-                                    <button type="submit" class="btn btn-sm btn-outline-danger" title="삭제">
-                                        <i class="bi bi-trash"></i>
-                                    </button>
-                                </form>
+        <div class="col-md-4 mb-2">
+            <div class="card border-left-success shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                                기간 입금 합계 (Total Deposit)
                             </div>
-                        </td>
-                        {% endif %}
-                    </tr>
-                    {% empty %}
-                    <tr>
-                        <td colspan="{% if user.is_superuser %}7{% else %}6{% endif %}" class="py-4 text-muted">거래 내역이 없습니다.</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+                            <div class="h5 mb-0 font-weight-bold text-primary">+ {{ deposit_total|intcomma }} 원</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="bi bi-arrow-down-circle-fill fs-2 text-primary"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4 mb-2">
+            <div class="card border-left-danger shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-danger text-uppercase mb-1">
+                                기간 출금 합계 (Total Withdraw)
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-danger">- {{ withdraw_total|intcomma }} 원</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="bi bi-arrow-up-circle-fill fs-2 text-danger"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
+
+    <div class="card shadow mb-4">
+        <div class="card-header bg-white py-3">
+            <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+                <h6 class="m-0 font-weight-bold text-primary">거래 내역 (Transactions)</h6>
+                
+                <form method="get" class="d-flex align-items-center gap-2">
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text bg-light"><i class="bi bi-calendar-range"></i></span>
+                        <input type="date" name="start_date" class="form-control" value="{{ start_date|default:'' }}" title="시작일">
+                        <span class="input-group-text">~</span>
+                        <input type="date" name="end_date" class="form-control" value="{{ end_date|default:'' }}" title="종료일">
+                        <button type="submit" class="btn btn-primary">조회</button>
+                        <a href="?" class="btn btn-outline-secondary" title="초기화"><i class="bi bi-arrow-clockwise"></i></a>
+                    </div>
+                    
+                    <button type="button" class="btn btn-primary btn-sm ms-2" data-bs-toggle="modal" data-bs-target="#createTransactionModal">
+                        <i class="bi bi-plus-lg"></i> 등록
+                    </button>
+                </form>
+            </div>
+        </div>
+        
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0 text-center">
+                    <thead class="bg-light text-secondary">
+                        <tr>
+                            <th>날짜</th>
+                            <th>구분</th>
+                            <th>적요</th>
+                            <th class="text-end">거래금액</th>
+                            <th class="text-end">거래후 잔액</th> 
+                            <th>담당자</th>
+                            {% if user.is_superuser %}
+                            <th>관리</th>
+                            {% endif %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for tr in transactions %}
+                        <tr>
+                            <td>{{ tr.date|date:"Y-m-d" }}</td>
+                            <td>
+                                {% if tr.transaction_type == 'DEPOSIT' %}
+                                    <span class="badge bg-soft-primary text-primary border border-primary">입금</span>
+                                {% else %}
+                                    <span class="badge bg-soft-danger text-danger border border-danger">출금</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-start ps-3">{{ tr.description }}</td>
+                            <td class="text-end fw-bold {% if tr.transaction_type == 'DEPOSIT' %}text-primary{% else %}text-danger{% endif %}">
+                                {% if tr.transaction_type == 'DEPOSIT' %}+{% else %}-{% endif %}
+                                {{ tr.amount|intcomma }}
+                            </td>
+                            <td class="text-end text-muted">{{ tr.bank_account.current_balance|intcomma }} (현재)</td> 
+                            <td>{{ tr.created_by.username|default:"-" }}</td>
+
+                            {% if user.is_superuser %}
+                            <td>
+                                <div class="btn-group" role="group">
+                                    <a href="{% url 'fulfillment:bank_transaction_update' tr.id %}" class="btn btn-sm btn-outline-secondary" title="수정">
+                                        <i class="bi bi-pencil-square"></i>
+                                    </a>
+                                    <form action="{% url 'fulfillment:bank_transaction_delete' tr.id %}" method="post" class="d-inline" onsubmit="return confirm('정말 삭제하시겠습니까?');">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn-sm btn-outline-danger" title="삭제">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </form>
+                                </div>
+                            </td>
+                            {% endif %}
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="{% if user.is_superuser %}7{% else %}6{% endif %}" class="py-5 text-muted">
+                                <i class="bi bi-emoji-neutral fs-1 d-block mb-2"></i>
+                                조회된 거래 내역이 없습니다.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
 </div>
+
+<div class="modal fade" id="createTransactionModal" tabindex="-1" aria-hidden="true">
+    </div>
 {% endblock %}
